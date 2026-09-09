@@ -7,7 +7,7 @@ from textwrap import dedent
 
 from .config import ROOT
 
-LABEL = "com.outlookgmail.calendar-syncer"
+LABEL = "com.outlook-to-gmail.calendar-syncer"
 PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
 
 

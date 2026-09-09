@@ -1,4 +1,4 @@
-# Outlook → Google Calendar sync (macOS)
+# outlook-to-gmail-calendar-syncer
 
 One-way copy of an **Outlook / Exchange** calendar into a **dedicated Google calendar**. Your Mac is the bridge: it reads Exchange (often only reachable on a company VPN) and writes copies to Google.
 
@@ -11,8 +11,8 @@ This is a **personal** tool. Check with IT before copying a work calendar to a p
 Python 3.11+ (Homebrew `python3.13` is fine; the system `/usr/bin/python3` on macOS is often 3.9 and will not work well).
 
 ```bash
-git clone https://github.com/YOUR_USER/outlook-gmail-calendar-syncer.git
-cd outlook-gmail-calendar-syncer
+git clone https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer.git
+cd outlook-to-gmail-calendar-syncer
 python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt

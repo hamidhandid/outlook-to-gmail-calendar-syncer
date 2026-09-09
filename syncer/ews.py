@@ -24,7 +24,7 @@ from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
 from .config import EwsSettings
 from .models import CalendarInfo, SourceEvent
 
-KEYRING_SERVICE = "outlook-gmail-calendar-syncer"
+KEYRING_SERVICE = "outlook-to-gmail-calendar-syncer"
 
 
 def _auth_type(name: str) -> Any:
