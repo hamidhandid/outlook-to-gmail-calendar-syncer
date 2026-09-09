@@ -1,0 +1,34 @@
+# One-way Outlook → Google Calendar. Copy this file to config.yaml
+# or run: python -m syncer setup
+
+# ews   = talk to Exchange / OWA host directly (does not need Apple Mail)
+# apple = read calendars already added in Calendar.app
+source: ews
+
+# Rolling window around today (UTC).
+days_back: 7
+days_forward: 60
+
+# full = copy title, location, notes
+# busy = only block the time as "Busy" (safer for a personal Google account)
+privacy: busy
+
+ews:
+  server: mail.company.com
+  email: you@company.com
+  # Leave empty to use the same as email. If login fails, try COMPANY\your.account
+  username: ""
+  # On-prem Exchange usually wants ntlm. Switch to basic if ntlm is rejected.
+  auth: ntlm
+  # Empty = default mailbox calendar. Run: python -m syncer list-calendars
+  calendar: ""
+  verify_ssl: true
+
+# Only used when source: apple
+apple_calendar: "Exchange / Calendar"
+
+# Google Calendar that will receive copies. Created automatically if missing.
+google_calendar: "Work (Outlook)"
+
+# Leave empty to use this Mac's timezone.
+timezone: ""
