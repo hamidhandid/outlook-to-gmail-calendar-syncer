@@ -40,7 +40,12 @@ def load_source_events(settings: Settings, start: datetime, end: datetime) -> li
             f"Reading Exchange {settings.ews.email} on {settings.ews.server} "
             f"from {start.date()} to {end.date()}…"
         )
-        return ews.load_events(settings.ews, start, end)
+        return ews.load_events(
+            settings.ews,
+            start,
+            end,
+            include_notes=settings.privacy == "full",
+        )
     from . import apple
 
     print(
@@ -56,16 +61,20 @@ def sync(settings: Settings, dry_run: bool = False) -> None:
     source_events = load_source_events(settings, window_start, window_end)
     print(f"Found {len(source_events)} Outlook/Exchange event(s).")
 
+    print("Connecting to Google Calendar…")
     service = google_service(settings.credentials_path, settings.token_path)
+    print("Looking up / creating the Google calendar…")
     calendar_id = find_or_create_calendar(service, settings.google_calendar, str(tz))
     print(f"Google calendar: {settings.google_calendar} ({calendar_id})")
 
+    print("Loading previously synced Google events…")
     existing = list_synced_events(service, calendar_id)
     by_origin: dict[str, dict] = {}
     for item in existing:
         origin = (item.get("extendedProperties") or {}).get("private", {}).get("origin_id")
         if origin:
             by_origin[origin] = item
+    print(f"Already mirrored on Google: {len(by_origin)}")
 
     created = updated = skipped = 0
     seen: set[str] = set()

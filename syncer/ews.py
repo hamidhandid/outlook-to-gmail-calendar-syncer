@@ -25,6 +25,7 @@ from .config import EwsSettings
 from .models import CalendarInfo, SourceEvent
 
 KEYRING_SERVICE = "outlook-to-gmail-calendar-syncer"
+EWS_TIMEOUT_SECONDS = 45
 
 
 def _auth_type(name: str) -> Any:
@@ -104,6 +105,7 @@ def _notes(item: CalendarItem) -> str:
 
 
 def connect(settings: EwsSettings, password: str | None = None) -> Account:
+    BaseProtocol.TIMEOUT = EWS_TIMEOUT_SECONDS
     if not settings.verify_ssl:
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
         warnings.filterwarnings("ignore", category=InsecureRequestWarning)
@@ -195,11 +197,35 @@ def load_events(
     start: datetime,
     end: datetime,
     account: Account | None = None,
+    *,
+    include_notes: bool = True,
 ) -> list[SourceEvent]:
     account = account or connect(settings)
     folder = _resolve_folder(account, settings.calendar)
+    # only() avoids per-item lazy fetches of body/attachments that hang on slow EWS.
+    fields = [
+        "id",
+        "uid",
+        "subject",
+        "start",
+        "end",
+        "is_all_day",
+        "location",
+        "legacy_free_busy_status",
+    ]
+    if include_notes:
+        fields.append("text_body")
     events: list[SourceEvent] = []
-    for item in folder.view(start=start, end=end):
+    try:
+        items = folder.view(start=start, end=end).only(*fields)
+    except Exception as exc:
+        raise SystemExit(
+            f"Timed out or failed reading Exchange calendar "
+            f"(timeout {EWS_TIMEOUT_SECONDS}s).\n"
+            "Connect the VPN and confirm OWA works, then retry.\n"
+            f"Detail: {exc}"
+        ) from exc
+    for item in items:
         if not isinstance(item, CalendarItem):
             continue
         try:
@@ -218,7 +244,7 @@ def load_events(
                 end=end_dt,
                 all_day=bool(item.is_all_day),
                 location=_location(item),
-                notes=_notes(item),
+                notes=_notes(item) if include_notes else "",
                 busy=free_busy not in {"Free", "NoData"},
                 tentative=free_busy == "Tentative",
             )
