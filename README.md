@@ -19,6 +19,14 @@ pip install -r requirements.txt
 python -m syncer setup
 ```
 
+Or open the interactive numbered menu:
+
+```bash
+python -m syncer
+```
+
+Then type a number (for example `9` for sync, `0` to quit).
+
 The **setup wizard** opens the Google Cloud pages in your browser and pauses after each step so you can:
 
 1. Create a Google Cloud project
@@ -38,6 +46,7 @@ Then, with the VPN connected:
 
 ```bash
 python -m syncer login          # Exchange password → Keychain
+python -m syncer tokens         # check Exchange + Google logins
 python -m syncer check
 python -m syncer sync --dry-run
 python -m syncer sync
@@ -60,7 +69,12 @@ Sign in with the **Gmail that should receive the work calendar**. Keep the **pro
 
 If Google says the app is unverified, choose **Advanced → Go to … (unsafe)**. That is expected for a personal project. Do not publish or request Google verification.
 
-While the app stays in **Testing**, Google may expire the login after **7 days**. Run `python -m syncer check` again to re-authorize.
+While the app stays in **Testing**, Google may expire the login after **7 days**. Sync will detect that and open a browser again, or you can run:
+
+```bash
+python -m syncer tokens
+python -m syncer reauth-google
+```
 
 ## Config
 
@@ -85,15 +99,43 @@ google_calendar: "Work (Outlook)"
 
 ## Commands
 
+Run `python -m syncer` with no arguments for a numbered interactive menu
+(`[1]` setup, `[5]` tokens, `[9]` sync, `[0]` quit, …).
+
 | Command | Purpose |
 |---|---|
+| `python -m syncer` | Numbered interactive menu of all commands |
 | `python -m syncer setup` | Interactive Google Cloud + config wizard |
-| `python -m syncer login` | Save Exchange password in Keychain |
+| `python -m syncer login` | Save / update Exchange password in Keychain |
+| `python -m syncer reauth-google` | Delete `token.json` and sign in to Google again |
+| `python -m syncer tokens` | Check Exchange + Google token / login status |
 | `python -m syncer list-calendars` | List Exchange (or Apple) calendars |
 | `python -m syncer check` | Test Exchange + Google login |
 | `python -m syncer sync` | Copy events |
+| `python -m syncer sync --dry-run` | Preview without writing to Google |
 | `python -m syncer install-schedule` | launchd, every 15 minutes |
 | `python -m syncer uninstall-schedule` | Remove launchd job |
+
+## If Google says SSL / `UNEXPECTED_EOF` / cannot reach oauth2.googleapis.com
+
+Your Mac reached Exchange (VPN works) but **cannot talk to Google**. Company VPNs often break or block `googleapis.com`.
+
+1. Disconnect the VPN briefly.
+2. Run `python -m syncer reauth-google` (or menu `[4]`).
+3. Disconnect is optional for later syncs if the token is still valid; reconnect VPN so Exchange can be read.
+4. Better long-term: ask IT for **split tunneling** so Google stays on the public internet while Exchange stays on the VPN.
+
+## If Google says `invalid_grant` / token expired
+
+That is almost always the Google refresh token, not Exchange. OAuth apps left in **Testing** expire after about 7 days.
+
+```bash
+python -m syncer tokens
+python -m syncer reauth-google
+python -m syncer sync
+```
+
+`sync` and `check` also try to refresh automatically; if refresh fails they open a browser sign-in instead of crashing.
 
 ## If Exchange login fails
 
@@ -101,7 +143,8 @@ google_calendar: "Work (Outlook)"
 2. Try `username` as the full email, then as `DOMAIN\account`.
 3. Try `auth: basic`.
 4. Set `verify_ssl: false` for a corporate TLS certificate.
-5. If IT disabled EWS or requires MFA that a password cannot satisfy, this tool cannot sign in.
+5. Re-save the password: `python -m syncer login`.
+6. If IT disabled EWS or requires MFA that a password cannot satisfy, this tool cannot sign in.
 
 ## What it will and will not do
 
