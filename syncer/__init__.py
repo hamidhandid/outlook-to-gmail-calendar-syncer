@@ -1,3 +1,5 @@
-"""Local one-way sync from Outlook/Exchange (via Apple Calendar) to Google Calendar."""
+"""Local one-way sync from Outlook/Exchange to Google Calendar."""
 
-__version__ = "0.1.0"
+from pathlib import Path
+
+__version__ = (Path(__file__).resolve().parent.parent / "VERSION").read_text(encoding="utf-8").strip()

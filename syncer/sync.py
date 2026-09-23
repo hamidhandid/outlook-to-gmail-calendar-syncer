@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from .config import Settings
@@ -9,12 +12,29 @@ from .google import (
     delete_event,
     detect_timezone,
     event_body,
-    find_or_create_calendar,
-    google_service,
     list_synced_events,
     upsert_event,
 )
-from .models import SourceEvent, default_window
+from .models import SourceEvent
+
+LogFn = Callable[[str, str], None]
+CancelEvent = threading.Event
+
+
+class Cancelled(Exception):
+    """Raised when the user asks to stop a Get/Sync."""
+
+
+def _emit(log: LogFn | None, level: str, message: str) -> None:
+    if log:
+        log(level, message)
+    else:
+        print(message)
+
+
+def check_cancelled(cancel: CancelEvent | None) -> None:
+    if cancel is not None and cancel.is_set():
+        raise Cancelled("Cancelled by user")
 
 
 def fingerprint(title: str, location: str, notes: str, start: str, end: str, extra: str) -> str:
@@ -31,54 +51,74 @@ def _google_start(event: dict, tz: ZoneInfo) -> datetime | None:
     return None
 
 
-def load_source_events(settings: Settings, start: datetime, end: datetime) -> list[SourceEvent]:
+def load_source_events(
+    settings: Settings,
+    start: datetime,
+    end: datetime,
+    *,
+    log: LogFn | None = None,
+    cancel: CancelEvent | None = None,
+) -> list[SourceEvent]:
+    check_cancelled(cancel)
     if settings.source == "ews":
         from . import ews
 
         assert settings.ews is not None
-        print(
+        _emit(
+            log,
+            "info",
             f"Reading Exchange {settings.ews.email} on {settings.ews.server} "
-            f"from {start.date()} to {end.date()}…"
+            f"from {start.date()} to {end.date()}…",
         )
-        return ews.load_events(
+        events = ews.load_events(
             settings.ews,
             start,
             end,
             include_notes=settings.privacy == "full",
         )
+        check_cancelled(cancel)
+        return events
     from . import apple
 
-    print(
+    _emit(
+        log,
+        "info",
         f"Reading Apple Calendar {settings.apple_calendar!r} "
-        f"from {start.date()} to {end.date()}…"
+        f"from {start.date()} to {end.date()}…",
     )
-    return apple.load_events(settings.apple_calendar, start, end)
+    events = apple.load_events(settings.apple_calendar, start, end)
+    check_cancelled(cancel)
+    return events
 
 
-def sync(settings: Settings, dry_run: bool = False) -> None:
-    tz = detect_timezone(settings.timezone)
-    window_start, window_end = default_window(settings.days_back, settings.days_forward)
-    source_events = load_source_events(settings, window_start, window_end)
-    print(f"Found {len(source_events)} Outlook/Exchange event(s).")
-
-    print("Connecting to Google Calendar…")
-    service = google_service(settings.credentials_path, settings.token_path)
-    print("Looking up / creating the Google calendar…")
-    calendar_id = find_or_create_calendar(service, settings.google_calendar, str(tz))
-    print(f"Google calendar: {settings.google_calendar} ({calendar_id})")
-
-    print("Loading previously synced Google events…")
+def list_existing_by_origin(service: Any, calendar_id: str) -> dict[str, dict]:
     existing = list_synced_events(service, calendar_id)
     by_origin: dict[str, dict] = {}
     for item in existing:
         origin = (item.get("extendedProperties") or {}).get("private", {}).get("origin_id")
         if origin:
             by_origin[origin] = item
-    print(f"Already mirrored on Google: {len(by_origin)}")
+    return by_origin
 
+
+def push_events_to_google(
+    settings: Settings,
+    source_events: list[SourceEvent],
+    *,
+    service: Any,
+    calendar_id: str,
+    by_origin: dict[str, dict],
+    window_start: datetime,
+    window_end: datetime,
+    tz: ZoneInfo,
+    dry_run: bool = False,
+    log: LogFn | None = None,
+    cancel: CancelEvent | None = None,
+) -> dict[str, int]:
     created = updated = skipped = 0
     seen: set[str] = set()
     for event in source_events:
+        check_cancelled(cancel)
         seen.add(event.origin_id)
         title = "Busy" if settings.privacy == "busy" else event.title
         location = "" if settings.privacy == "busy" else event.location
@@ -92,14 +132,26 @@ def sync(settings: Settings, dry_run: bool = False) -> None:
             f"{event.all_day}|{event.busy}|{event.tentative}|{settings.privacy}",
         )
         current = by_origin.get(event.origin_id)
-        current_fp = (current.get("extendedProperties") or {}).get("private", {}).get("fp") if current else None
+        current_fp = (
+            (current.get("extendedProperties") or {}).get("private", {}).get("fp")
+            if current
+            else None
+        )
         if current and current_fp == fp:
             skipped += 1
             continue
         body = event_body(event, settings.privacy, tz, fp)
         action = "update" if current else "create"
-        print(f"  {action:6}  {event.start.astimezone(tz):%Y-%m-%d %H:%M}  {title}")
+        _emit(
+            log,
+            "info",
+            f"  {action:6}  {event.start.astimezone(tz):%Y-%m-%d %H:%M}  {title}",
+        )
         if dry_run:
+            if current:
+                updated += 1
+            else:
+                created += 1
             continue
         result = upsert_event(service, calendar_id, body, current)
         if result == "created":
@@ -109,30 +161,25 @@ def sync(settings: Settings, dry_run: bool = False) -> None:
 
     deleted = 0
     for origin, item in by_origin.items():
+        check_cancelled(cancel)
         if origin in seen:
             continue
         start = _google_start(item, tz)
         if start is None:
             continue
-        if start.astimezone(timezone.utc) < window_start or start.astimezone(timezone.utc) > window_end:
+        if (
+            start.astimezone(timezone.utc) < window_start
+            or start.astimezone(timezone.utc) > window_end
+        ):
             continue
-        print(f"  delete  {item.get('summary')}")
+        _emit(log, "info", f"  delete  {item.get('summary')}")
         if not dry_run:
             delete_event(service, calendar_id, item["id"])
         deleted += 1
 
-    prefix = "Dry run. Would have " if dry_run else ""
-    print(
-        f"{prefix}created={created} updated={updated} deleted={deleted} unchanged={skipped}"
-    )
-    if not source_events:
-        if settings.source == "ews":
-            print(
-                "No source events. Connect the company VPN, run `python -m syncer login`, "
-                "and confirm OWA at mail.digikala.com shows meetings."
-            )
-        else:
-            print(
-                "No source events. Connect the company VPN, open Calendar.app, "
-                "and confirm the work calendar is showing meetings, then retry."
-            )
+    return {
+        "created": created,
+        "updated": updated,
+        "deleted": deleted,
+        "unchanged": skipped,
+    }

@@ -365,10 +365,14 @@ def run_wizard(*, google_only: bool = False) -> None:
         "Save the Exchange password in Keychain now?", default=True
     ):
         from . import ews
-        from .config import load_settings
+        from .config import ConfigError, load_settings
 
-        settings = load_settings()
-        if settings.ews is None:
+        try:
+            settings = load_settings()
+        except ConfigError as exc:
+            print(exc)
+            settings = None
+        if settings is None or settings.ews is None:
             print("source is not ews; skipping Exchange login.")
         else:
             ews.prompt_and_save_password(settings.ews.email)
