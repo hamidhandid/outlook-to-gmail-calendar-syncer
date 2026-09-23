@@ -1,49 +1,43 @@
 # Changelog
 
+All notable changes are documented here.  
+GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH` (see `VERSION`).
+
 ## Unreleased
+
+## 0.2.0 — 2026-09-23
 
 ### Added
 
-- **Interactive numbered menu** — run with no arguments:
-
-  ```bash
-  python -m syncer
-  ```
-
-  Then enter a number:
-
-  | Number | Action |
-  |---:|---|
-  | `1` | setup |
-  | `2` | setup --google-only |
-  | `3` | login |
-  | `4` | reauth-google |
-  | `5` | tokens |
-  | `6` | list-calendars |
-  | `7` | check |
-  | `8` | sync --dry-run |
-  | `9` | sync |
-  | `10` | install-schedule |
-  | `11` | uninstall-schedule |
-  | `0` | quit |
-
-- `python -m syncer tokens` — check whether Exchange and Google logins/tokens are still valid.
-- `python -m syncer reauth-google` — delete `token.json` and sign in to Google again.
+- **Desktop GUI** (`python -m syncer gui`) with CustomTkinter (Homebrew: `brew install python-tk@3.13`):
+  - System light/dark appearance
+  - Config form (`days_back`, `days_forward`, email, server, privacy, …) saved to `config.yaml`
+  - **Get** loads Outlook events; **Sync** enabled after a successful Get
+  - **Stop** cancels an in-progress Get/Sync between steps
+  - Logs: green success / light red errors; status line for outcome
+  - Check tokens, Login Exchange, Reauth Google, Setup Google, Import credentials
+- Shared library API (`syncer.api`: `get_events`, `run_sync`, …) used by CLI and GUI
+- First-run bootstrap (`syncer.bootstrap`): creates `config.yaml` if missing; guides creation of `credentials.json`; `token.json` after first Google sign-in
+- `python -m syncer get` — list Outlook events in the date window
+- Numbered interactive menu: `python -m syncer`
+- `python -m syncer tokens` / `reauth-google`
+- Project version in `VERSION` and `python -m syncer --version`
 
 ### Fixed
 
-- Google `invalid_grant` / expired refresh token no longer crashes `sync` or `check`. The tool clears the old token and opens a browser sign-in instead (common while the OAuth app is left in Testing; tokens last ~7 days).
-- SSL / network errors talking to `oauth2.googleapis.com` (often company VPN) show a short guide instead of a long traceback. Interactive menu catches command failures and returns to the prompt.
-- Sync no longer hangs forever when Google is unreachable: Google HTTP timeout is 30s; Exchange EWS timeout is 45s. Progress lines show which step is running.
-- Exchange event fetch uses `.only(...)` so body/notes are not lazy-loaded one-by-one (that used to stall on slow servers). Notes are skipped entirely when `privacy: busy`.
+- Google `invalid_grant` / expired refresh token recovers with re-auth instead of crashing
+- SSL / network errors to Google show a short VPN guide
+- Sync fails fast on VPN hangs (Google ~30s, Exchange ~45s) with step progress
+- Exchange fetch uses `.only(...)`; notes skipped when `privacy: busy`
 
 ### Notes
 
-- **VPN tip:** Exchange needs the company VPN; Google OAuth / Calendar API need the public internet. If sync hangs or times out after “Found N event(s)”, disconnect VPN briefly for Google, or ask IT for split tunneling.
+- Exchange needs the company VPN; Google OAuth/Calendar need the public internet (or split tunneling)
+- A real `credentials.json` still requires Google Cloud Desktop OAuth (Setup Google / import); the app cannot invent valid Google client secrets
 
 ## 0.1.0 — 2026-09-09
 
-- Initial release: one-way Outlook/Exchange → Google Calendar sync on macOS.
-- EWS source (`mail.company.com`) without Apple Mail.
-- Interactive `setup` wizard for Google Cloud OAuth / Calendar API.
-- Optional launchd schedule every 15 minutes.
+- Initial release: one-way Outlook/Exchange → Google Calendar sync on macOS
+- EWS source without Apple Mail
+- Interactive `setup` wizard for Google Cloud OAuth / Calendar API
+- Optional launchd schedule every 15 minutes
