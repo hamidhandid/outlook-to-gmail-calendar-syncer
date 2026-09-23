@@ -6,6 +6,10 @@ __pycache__/
 .env
 config.yaml
 credentials.json
+credentials.PLACEHOLDER.json
 token.json
 logs/
 .DS_Store
+dist/
+build/
+*.spec
