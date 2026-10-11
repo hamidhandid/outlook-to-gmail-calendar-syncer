@@ -5,6 +5,8 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-11
+
 ### Added
 
 - **Linux and Windows** support alongside macOS (EWS + Google; `source: apple` remains macOS-only)
@@ -16,6 +18,11 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 - CLI/docs refer to the OS keyring instead of Keychain-only wording
 - GUI missing-Tk message includes Windows and Linux install hints
+
+### Notes
+
+- macOS launchd, EventKit (`source: apple`), and Foundation timezone detection are unchanged
+- On Linux/Windows use `source: ews`; headless Linux may need `EWS_PASSWORD` if no Secret Service is available
 
 ## 0.2.0 — 2026-09-23
 

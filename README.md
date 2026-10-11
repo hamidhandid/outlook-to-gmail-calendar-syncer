@@ -193,7 +193,7 @@ python -m syncer sync
 ## Versioning & releases
 
 - Current version: see [`VERSION`](VERSION) (also `python -m syncer --version`).
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.2.0`).
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.3.0`).
 - Tag locally after bumping `VERSION` + changelog, then push the tag and attach build artifacts on GitHub Releases.
 
 ## License
