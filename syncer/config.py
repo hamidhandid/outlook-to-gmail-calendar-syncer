@@ -69,6 +69,14 @@ def _parse_settings(data: dict, config_path: Path) -> Settings:
     source = str(data.get("source", "ews")).strip().lower()
     if source not in {"ews", "apple"}:
         raise ConfigError("config.yaml: source must be 'ews' or 'apple'")
+    if source == "apple":
+        import sys
+
+        if sys.platform != "darwin":
+            raise ConfigError(
+                "config.yaml: source: apple is only supported on macOS.\n"
+                "On Linux or Windows, set source: ews."
+            )
     apple_calendar = str(data.get("apple_calendar", "")).strip()
     ews = _ews_settings(data) if source == "ews" else None
     if source == "apple" and not apple_calendar:

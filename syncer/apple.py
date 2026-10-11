@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import sys
 import time
 from datetime import datetime, timezone
 from typing import Any
+
+# Apple Calendar / EventKit is macOS-only. Linux/Windows must use source: ews.
+if sys.platform != "darwin":
+    raise SystemExit(
+        "source: apple is only supported on macOS (Apple Calendar / EventKit).\n"
+        "On Linux or Windows, set source: ews in config.yaml."
+    )
 
 from EventKit import (  # type: ignore
     EKAuthorizationStatusDenied,

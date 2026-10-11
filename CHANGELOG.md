@@ -5,6 +5,18 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 ## Unreleased
 
+### Added
+
+- **Linux and Windows** support alongside macOS (EWS + Google; `source: apple` remains macOS-only)
+- Portable timezone detection via `tzlocal` when `timezone` is empty (macOS still uses Foundation)
+- `install-schedule` / `uninstall-schedule` for Windows Task Scheduler and Linux systemd `--user`
+- Platform-marked dependencies: pyobjc (darwin only), `tzdata` (Windows), SecretStorage (Linux)
+
+### Changed
+
+- CLI/docs refer to the OS keyring instead of Keychain-only wording
+- GUI missing-Tk message includes Windows and Linux install hints
+
 ## 0.2.0 — 2026-09-23
 
 ### Added

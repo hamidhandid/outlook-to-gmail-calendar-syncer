@@ -13,3 +13,4 @@ logs/
 dist/
 build/
 *.spec
+run-sync-scheduled.cmd

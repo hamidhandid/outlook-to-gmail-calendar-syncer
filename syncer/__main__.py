@@ -19,7 +19,7 @@ MENU_ACTIONS = [
     ("gui", "Open the graphical app"),
     ("setup", "Interactive Google Cloud + config wizard"),
     ("setup --google-only", "Google OAuth client only"),
-    ("login", "Save / update Exchange password in Keychain"),
+    ("login", "Save / update Exchange password in the system keyring"),
     ("reauth-google", "Delete Google token and sign in again"),
     ("tokens", "Check Exchange + Google token / login status"),
     ("list-calendars", "List Exchange or Apple calendars"),
@@ -27,7 +27,7 @@ MENU_ACTIONS = [
     ("get", "List Outlook events in the configured date window"),
     ("sync --dry-run", "Preview sync without writing to Google"),
     ("sync", "Copy Outlook events into Google Calendar"),
-    ("install-schedule", "Run sync every 15 minutes via launchd"),
+    ("install-schedule", "Run sync every 15 minutes (launchd / Task Scheduler / systemd)"),
     ("uninstall-schedule", "Stop the background schedule"),
 ]
 
@@ -251,7 +251,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("gui", help="Open the CustomTkinter desktop app.")
-    sub.add_parser("login", help="Save Exchange password in Keychain and test the login.")
+    sub.add_parser(
+        "login",
+        help="Save Exchange password in the system keyring and test the login.",
+    )
     sub.add_parser(
         "reauth-google",
         help="Delete token.json and open a browser to sign in to Google again.",
@@ -278,7 +281,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print what would change without writing to Google.",
     )
-    sub.add_parser("install-schedule", help="Run sync every 15 minutes via launchd.")
+    sub.add_parser(
+        "install-schedule",
+        help="Run sync every 15 minutes (macOS launchd, Windows Task Scheduler, or Linux systemd --user).",
+    )
     sub.add_parser("uninstall-schedule", help="Stop the background schedule.")
     return parser
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -310,9 +311,33 @@ def delete_event(service: Any, calendar_id: str, event_id: str) -> None:
         raise SystemExit(f"Google Calendar API error: {exc}") from exc
 
 
+def _portable_local_zone() -> ZoneInfo:
+    """IANA zone for Linux/Windows when config timezone is empty."""
+    try:
+        from tzlocal import get_localzone_name
+
+        name = get_localzone_name()
+        if name:
+            return ZoneInfo(str(name))
+    except Exception:
+        pass
+    # stdlib fallback (often a fixed offset on Windows without tzdata/tzlocal)
+    local = datetime.now().astimezone()
+    key = getattr(local.tzinfo, "key", None)
+    if key:
+        try:
+            return ZoneInfo(str(key))
+        except Exception:
+            pass
+    return ZoneInfo("UTC")
+
+
 def detect_timezone(configured: str) -> ZoneInfo:
     if configured:
         return ZoneInfo(configured)
-    from Foundation import NSTimeZone  # type: ignore
+    # macOS: keep the existing Foundation path (do not change working behavior).
+    if sys.platform == "darwin":
+        from Foundation import NSTimeZone  # type: ignore
 
-    return ZoneInfo(str(NSTimeZone.localTimeZone().name()))
+        return ZoneInfo(str(NSTimeZone.localTimeZone().name()))
+    return _portable_local_zone()

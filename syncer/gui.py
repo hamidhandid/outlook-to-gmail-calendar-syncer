@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 def run_gui() -> None:
-    """Open the CustomTkinter app. Requires Tk (Homebrew: brew install python-tk@3.13)."""
+    """Open the CustomTkinter app. Requires Tk + customtkinter on all platforms."""
     try:
         import tkinter  # noqa: F401
         import customtkinter  # noqa: F401
@@ -10,12 +10,15 @@ def run_gui() -> None:
         raise SystemExit(
             "GUI needs Tk + customtkinter.\n"
             "\n"
-            "On Homebrew Python:\n"
+            "macOS (Homebrew Python):\n"
             "  brew install python-tk@3.13\n"
-            "  source .venv/bin/activate\n"
             "  pip install customtkinter\n"
             "\n"
-            "Or use the python.org macOS installer (includes Tk), recreate the venv, then:\n"
+            "Windows (python.org installer): enable Tcl/Tk, then:\n"
+            "  pip install -r requirements.txt\n"
+            "\n"
+            "Linux (Debian/Ubuntu):\n"
+            "  sudo apt install python3-tk\n"
             "  pip install -r requirements.txt\n"
             "\n"
             f"Detail: {exc}"

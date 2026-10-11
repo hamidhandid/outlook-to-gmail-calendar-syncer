@@ -1,6 +1,8 @@
 # outlook-to-gmail-calendar-syncer
 
-One-way copy of an **Outlook / Exchange** calendar into a **dedicated Google calendar**. Your Mac is the bridge: it reads Exchange (often only reachable on a company VPN) and writes copies to Google.
+One-way copy of an **Outlook / Exchange** calendar into a **dedicated Google calendar**. Your computer is the bridge: it reads Exchange (often only reachable on a company VPN) and writes copies to Google.
+
+Works on **macOS**, **Windows**, and **Linux**. Use `source: ews` (recommended everywhere). `source: apple` (Calendar.app / EventKit) is **macOS only**.
 
 Apple Mail is not required. Attendees are not copied, so coworkers do not get extra invites.
 
@@ -8,13 +10,26 @@ This is a **personal** tool. Check with IT before copying a work calendar to a p
 
 ## Quick start
 
-Python 3.11+ (Homebrew `python3.13` is fine; the system `/usr/bin/python3` on macOS is often 3.9 and will not work well).
+Python **3.11+**.
 
 ```bash
 git clone https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer.git
 cd outlook-to-gmail-calendar-syncer
-python3.13 -m venv .venv
+python3 -m venv .venv
+```
+
+**macOS / Linux**
+
+```bash
 source .venv/bin/activate
+pip install -r requirements.txt
+python -m syncer setup
+```
+
+**Windows** (Command Prompt or PowerShell)
+
+```bat
+.venv\Scripts\activate
 pip install -r requirements.txt
 python -m syncer setup
 ```
@@ -22,8 +37,12 @@ python -m syncer setup
 ### GUI (recommended for ordinary users)
 
 ```bash
-# Homebrew Python needs the Tk package once:
+# macOS Homebrew Python needs Tk once:
 brew install python-tk@3.13
+
+# Linux (Debian/Ubuntu):
+#   sudo apt install python3-tk
+# Windows: use the python.org installer with Tcl/Tk enabled
 
 pip install -r requirements.txt   # includes customtkinter
 python -m syncer gui
@@ -67,7 +86,7 @@ If Google says the app is unverified: **Advanced → Go to … (unsafe)**. While
 ```bash
 python -m syncer login
 python -m syncer tokens
-python -m syncer get              # list events in the date window
+python -m syncer get              # list events in the configured date window
 python -m syncer sync --dry-run
 python -m syncer sync
 python -m syncer install-schedule # optional, every 15 minutes
@@ -94,6 +113,8 @@ ews:
 google_calendar: "Work (Outlook)"
 ```
 
+On Linux/Windows keep `source: ews`. On macOS you may use `source: apple` to read Calendar.app instead.
+
 ## Commands
 
 CLI and GUI share `syncer.api` (`get_events`, `run_sync`, …).
@@ -103,16 +124,31 @@ CLI and GUI share `syncer.api` (`get_events`, `run_sync`, …).
 | `python -m syncer gui` | CustomTkinter desktop app |
 | `python -m syncer` | Numbered interactive menu |
 | `python -m syncer setup` | Google Cloud + config wizard |
-| `python -m syncer login` | Save / update Exchange password in Keychain |
+| `python -m syncer login` | Save / update Exchange password in the OS keyring |
 | `python -m syncer reauth-google` | Delete `token.json` and sign in to Google again |
 | `python -m syncer tokens` | Check Exchange + Google token / login status |
 | `python -m syncer get` | List Outlook events in the date window |
-| `python -m syncer list-calendars` | List Exchange (or Apple) calendars |
+| `python -m syncer list-calendars` | List Exchange (or Apple on macOS) calendars |
 | `python -m syncer check` | Test Exchange + Google login |
 | `python -m syncer sync` | Copy events |
 | `python -m syncer sync --dry-run` | Preview without writing to Google |
-| `python -m syncer install-schedule` | launchd, every 15 minutes |
-| `python -m syncer uninstall-schedule` | Remove launchd job |
+| `python -m syncer install-schedule` | Schedule every 15 minutes (see below) |
+| `python -m syncer uninstall-schedule` | Remove the background schedule |
+
+### Background schedule by OS
+
+| OS | Mechanism |
+|---|---|
+| macOS | `launchd` LaunchAgent (unchanged) |
+| Windows | Task Scheduler + generated `run-sync-scheduled.cmd` |
+| Linux | `systemd --user` timer (or cron if systemd is unavailable) |
+
+## Platform notes
+
+- **Password storage**: macOS Keychain / Windows Credential Manager / Linux Secret Service (`SecretStorage`). Or set `EWS_PASSWORD`.
+- **Linux keyring**: needs a desktop session with a Secret Service (e.g. GNOME Keyring). Headless: use `EWS_PASSWORD`.
+- **Windows timezone**: `tzdata` is installed via `requirements.txt` so IANA zones work with `zoneinfo`.
+- **pyobjc** (Apple Calendar / Foundation TZ) installs only on macOS.
 
 ## If Google says SSL / `UNEXPECTED_EOF` / cannot reach oauth2.googleapis.com
 
@@ -150,8 +186,8 @@ python -m syncer sync
 
 ## Privacy
 
-- `credentials.json` and `token.json` stay on your Mac (gitignored).  
-- Exchange password is stored in **macOS Keychain**, not in the repo.  
+- `credentials.json` and `token.json` stay on this machine (gitignored).  
+- Exchange password is stored in the **OS keyring**, not in the repo.  
 - Prefer `privacy: busy` on a personal Google account.
 
 ## Versioning & releases

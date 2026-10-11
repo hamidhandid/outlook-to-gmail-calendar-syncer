@@ -59,7 +59,9 @@ def prompt_and_save_password(email: str) -> str:
     if not password:
         raise SystemExit("Password was empty.")
     save_password(email, password)
-    print("Password saved in macOS Keychain.")
+    from .platform_util import keyring_store_name
+
+    print(f"Password saved in {keyring_store_name()}.")
     return password
 
 

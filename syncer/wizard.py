@@ -275,7 +275,7 @@ def _write_config(
 def walk_exchange_config() -> None:
     print("Exchange / Outlook connection")
     print(
-        "This Mac talks to your mail server over Exchange Web Services.\n"
+        "This computer talks to your mail server over Exchange Web Services.\n"
         "Apple Mail is not required. Connect the company VPN first."
     )
     if CONFIG_PATH.exists():
@@ -362,7 +362,7 @@ def run_wizard(*, google_only: bool = False) -> None:
         ).rstrip()
     )
     if CONFIG_PATH.exists() and _yes(
-        "Save the Exchange password in Keychain now?", default=True
+        "Save the Exchange password in the system keyring now?", default=True
     ):
         from . import ews
         from .config import ConfigError, load_settings

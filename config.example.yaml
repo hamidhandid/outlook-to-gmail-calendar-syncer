@@ -30,5 +30,5 @@ apple_calendar: "Exchange / Calendar"
 # Google Calendar that will receive copies. Created automatically if missing.
 google_calendar: "Work (Outlook)"
 
-# Leave empty to use this Mac's timezone.
+# Leave empty to use the OS timezone (macOS Foundation / tzlocal elsewhere).
 timezone: ""

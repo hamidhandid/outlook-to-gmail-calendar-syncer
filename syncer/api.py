@@ -279,7 +279,9 @@ def login_exchange(
     try:
         if password:
             ews.save_password(settings.ews.email, password)
-            _log(log, "info", "Password saved in macOS Keychain.")
+            from .platform_util import keyring_store_name
+
+            _log(log, "info", f"Password saved in {keyring_store_name()}.")
         else:
             ews.prompt_and_save_password(settings.ews.email)
         account = ews.connect(settings.ews)
