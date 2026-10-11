@@ -1,86 +1,88 @@
 # First-time setup guide (macOS)
 
-Step-by-step for people setting up Outlook/Exchange → Google Calendar sync on a **Mac** for the first time.
-
 فارسی: [راهنمای نصب اولیه](FIRST_TIME_FA.md)
 
-> **Internet & VPN (Iran)**
->
-> Keep these two modes separate:
->
-> 1. **Personal VPN / unblocked internet** is required for (plain Iranian internet often fails):
->    - Installing Homebrew and Python
->    - `git clone` and `pip install`
->    - Google Cloud Console, downloading `credentials.json`, and Gmail sign-in
-> 2. **Company mail** (e.g. `mail.digikala.com`):
->    - Turn **off** your personal VPN
->    - Turn **on** the company VPN, **or** join Wi‑Fi where the company mailbox opens
->
-> If the company VPN blocks Google/Homebrew, switch back to a personal VPN for those steps (or use split tunneling if you have it).
+Before we start — one important thing about internet and VPN (this trips people up a lot in Iran):
 
-Windows / Linux users: use the [README Quick start](../README.md#quick-start); the Google + Exchange wizard (`python -m syncer setup`) is the same idea.
+- Whenever you need **Gmail**, or to install **Homebrew / brew**, or to install Python packages (`pip install`) and download the project from GitHub, turn on a **personal VPN**. Plain Iranian internet often is **not** enough and things will hang or fail.
+- Whenever you need **company email** (for example the server `mail.digikala.com`), turn your **personal VPN off** and turn the **company VPN on**. Or join Wi‑Fi where company mail actually opens.
+
+OK — let’s do it.
 
 ---
 
-## 1. Terminal and Homebrew
+First, if you have a good personal VPN, turn it on (you’ll need it for installs and Google).
 
-Open **Terminal**. Turn on a **personal VPN** before installing Homebrew/Python (unfiltered internet; plain Iranian connectivity often is not enough).
+Then open the **Terminal** app.
 
-If Homebrew is not installed:
+If you don’t have **Homebrew / brew** on your Mac yet, paste this into Terminal and press Enter:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-On Apple Silicon, add brew to your PATH if the installer tells you to, for example:
+Wait until it finishes. If at the end it prints a few lines telling you to add something to `~/.zprofile`, copy those commands and run them. On newer Macs a common version looks like this:
 
 ```bash
 echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
 eval "$(/opt/homebrew/bin/brew shellenv)"
 ```
 
-Install Python 3.11:
+After brew installed successfully, run this so Python 3.11 gets installed:
 
 ```bash
 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install python@3.11
 ```
 
----
-
-## 2. Folder and clone
+Now make a folder. For example, to create a folder named `outlook-to-gmail` on your Desktop:
 
 ```bash
 mkdir -p ~/Desktop/outlook-to-gmail
+```
+
+Go into that folder:
+
+```bash
 cd ~/Desktop/outlook-to-gmail
+```
+
+Now run this to download the project from GitHub (keep the personal VPN on):
+
+```bash
 git clone https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer.git
+```
+
+Then go into the folder that was just downloaded:
+
+```bash
 cd outlook-to-gmail-calendar-syncer
 ```
 
----
-
-## 3. Virtualenv and dependencies
-
-Keep the **personal VPN** on so `pip` can download packages.
+Now this:
 
 ```bash
 python3.11 -m venv .venv
+```
+
+Then this:
+
+```bash
 source .venv/bin/activate
+```
+
+Then run this and wait until it fully finishes (personal VPN still on):
+
+```bash
 pip install -r requirements.txt
 ```
 
-Wait until pip finishes. Later sessions: activate `.venv` again from this project folder before running commands.
-
----
-
-## 4. Setup wizard
-
-Do the Google Cloud and Gmail steps with a **personal VPN** (internet that can reach Google).
+When that’s done, run this to start the first-time setup for your Google calendar (personal VPN still on — we’re talking to Google):
 
 ```bash
 python -m syncer setup
 ```
 
-You should see:
+You’ll see something like:
 
 ```text
 Outlook → Google Calendar setup wizard
@@ -93,109 +95,144 @@ It then writes config.yaml for your Exchange server.
 Press Enter to start…
 ```
 
-Press **Enter**, follow each browser step, then return to Terminal and press **Enter** again.
+Press **Enter** on your keyboard.
 
-### Step 1 — Create a Google Cloud project
+Then you’ll see Step 1 (Create a Google Cloud project) and a browser page should open. Pick a project name (for example `outlook-calendar-sync`) and click Create. At the top of the page, make sure that same project is selected.
 
-Name it something like `outlook-calendar-sync` → **Create**. Select that project in the top project picker.
+Come back to Terminal and press **Enter** again.
 
-`https://console.cloud.google.com/projectcreate`
+Now you’ll see Step 2 (Enable the Google Calendar API). In the browser click **Enable**. When it’s done, go back to Terminal and press Enter.
 
-### Step 2 — Enable the Google Calendar API
+Then Step 3 (OAuth consent / Google Auth Platform). In the browser:
 
-Confirm the project name → **Enable**.
+1. If you see **Get started**, click it.
+2. For App name, type something like `Outlook Calendar Sync`.
+3. For User support email, pick your Gmail and click Next.
+4. Set Audience to **External** and click Next. (Internal is only for a company Google Workspace account. Personal Gmail must be External.)
+5. For Contact Information put your email again and click Next.
+6. Check the box at the end and click Continue / Create.
 
-`https://console.cloud.google.com/apis/library/calendar-json.googleapis.com`
+Come back to Terminal and press Enter.
 
-### Step 3 — OAuth consent (Google Auth Platform)
+Step 4 — Add yourself as a test user. In the browser, under Test users click **Add users**, type your full Gmail, Save. Back to Terminal → Enter.
 
-1. Click **Get started** if shown.
-2. **App name:** e.g. `Outlook Calendar Sync`
-3. **User support email:** your Gmail
-4. **Audience:** **External** (required for personal Gmail; Internal is Workspace-only)
-5. **Contact email:** your Gmail again
-6. Accept the policy → **Create / Finish**
+Now Step 5 — this one is important:
 
-`https://console.cloud.google.com/auth/overview`
+In the browser click **Create client**. For Application type choose **Desktop app** (not Web, not iOS). Give it a name like `Mac syncer` and click Create. In the popup click **Download JSON**.
 
-### Step 4 — Add yourself as a test user
+Back to Terminal → Enter.
 
-While the app is in Testing, only listed accounts can sign in.
-
-Audience → **Test users** → **Add users** → your full Gmail → **Save**.
-
-`https://console.cloud.google.com/auth/audience`
-
-### Step 5 — Create a Desktop OAuth client (important)
-
-1. **Create client**
-2. **Application type:** **Desktop app** (not Web, not iOS)
-3. **Name:** e.g. `Mac syncer`
-4. **Create**
-5. **Download JSON**
-
-`https://console.cloud.google.com/auth/clients`
-
-### Step 6 — Save `credentials.json`
-
-The wizard prints the required path, for example:
+You’ll see something like this (paths will be different on your Mac):
 
 ```text
+Step 6 — Save credentials.json in this project
 The file must end up at:
   /Users/YOU/Desktop/outlook-to-gmail/outlook-to-gmail-calendar-syncer/credentials.json
-```
-
-If it finds a `client_secret_….apps.googleusercontent.com.json` in Downloads:
-
-```text
+Found a Google client file in Downloads:
+  /Users/YOU/Downloads/client_secret_….apps.googleusercontent.com.json
 Copy that file here as credentials.json? [Y/n]:
 ```
 
-Type **`Y`** and Enter.
+Here type **`Y`** and press Enter.
 
----
-
-## 5. Exchange / Outlook answers
+Now you’ll see:
 
 ```text
 Exchange / Outlook connection
-…
+This computer talks to your mail server over Exchange Web Services.
+Apple Mail is not required. Connect the company VPN first.
 Work email address:
 ```
 
-| Prompt | Typical Digikala / Fidibo answer |
-|---|---|
-| Work email address | Work address, e.g. `you@digikala.com` or `you@fidibo.com` (not `@mail.…`) |
-| Exchange host | `mail.digikala.com` |
-| Username | Leave empty (Enter); if login fails later, try `DOMAIN\account` |
-| Auth type | Enter for default `ntlm` |
-| Verify TLS certificates? | **`n`** if the company uses an internal CA |
-| full or busy | `full` for titles/notes; Enter / `busy` for Busy blocks only |
-| Google calendar name | Enter for `Work (Outlook)` |
-| Days past / future | Numbers, or Enter for `7` / `60` |
+Type your work email here. For example `you@digikala.com` or `you@fidibo.com` (don’t type `@mail.digikala.com` — that’s the server name, not your email). Press Enter.
+
+Next it asks:
+
+```text
+Exchange host (from OWA, without https://) [mail.company.com]:
+```
+
+For Digikala you can type:
+
+```text
+mail.digikala.com
+```
+
+and press Enter. For username you can leave it empty and just press Enter.
+
+If you see:
+
+```text
+Auth type: ntlm or basic [ntlm]:
+```
+
+just press Enter again (leave it on ntlm).
 
 Then:
+
+```text
+Verify TLS certificates? Choose n if the company uses an internal CA [Y/n]:
+```
+
+Type **`n`** and press Enter.
+
+Then:
+
+```text
+Copy full details (full) or only Busy blocks (busy)? [busy]:
+```
+
+If you want full event titles and details, type `full` and Enter. If you only want Busy blocks, press Enter or type `busy`.
+
+Then:
+
+```text
+Name of the Google calendar to create/use [Work (Outlook)]:
+```
+
+You can just press Enter.
+
+Then:
+
+```text
+Days of past events to copy [7]:
+```
+
+This tells the script how many days back to copy. Type a number, or press Enter for the default of 7.
+
+Then:
+
+```text
+Days of future events to copy [60]:
+```
+
+Same idea for the future — Enter means 60 days ahead, or type your own number.
+
+Then you’ll see:
 
 ```text
 Save the Exchange password in the system keyring now? [Y/n]:
 ```
 
-**`Y`** → Enter. For saving the password and testing Exchange:
+Type **`Y`** and press Enter.
 
-1. Turn **off** the personal VPN  
-2. Turn **on** the company VPN, **or** join office Wi‑Fi / a network where company mail works  
+Important: so it can reach company email, turn your **personal VPN off** and turn the **company VPN on** (or join Wi‑Fi where company mail opens).
+
+You’ll see:
 
 ```text
 Password for you@company.com:
 ```
 
-Type the password (characters usually stay hidden) → Enter.
+Type your email password. Don’t worry if Terminal doesn’t show any characters — that’s normal. Type it anyway, then press Enter.
+
+Then:
 
 ```text
 Open the Google sign-in now to test Calendar access? [Y/n]:
 ```
 
-**`Y`** → Enter. For this step you need a **personal VPN** again so Gmail opens. Pick your personal Gmail → **Continue**. When done:
+Type **`Y`** and press Enter. For this step turn the **personal VPN back on** so Gmail can open. In the browser pick your Gmail account and click Continue. You can close that tab afterward. When you go back to Terminal you should basically see:
 
 ```text
 Setup finished.
@@ -203,25 +240,30 @@ Setup finished.
 
 ---
 
-## 6. Day-to-day use
+From now on, whenever you want to use it, open Terminal and go to that same folder. In this example it was:
 
-For **Outlook get / sync**, use the company VPN (or office Wi‑Fi). For Gmail/token issues, switch back to a personal VPN. Each time:
+`~/Desktop/outlook-to-gmail/outlook-to-gmail-calendar-syncer`
+
+So:
 
 ```bash
 cd ~/Desktop/outlook-to-gmail/outlook-to-gmail-calendar-syncer
+```
+
+Then:
+
+```bash
 source .venv/bin/activate
+```
+
+Then:
+
+```bash
 python -m syncer
 ```
 
-Useful menu numbers:
+You’ll get a numbered menu. For example, number **9** shows your events (by default from about 7 days ago to 60 days ahead). If you see your events, Outlook/Exchange is probably fine — just remember you need company VPN / company Wi‑Fi for that.
 
-| # | Command | Purpose |
-|---|---|---|
-| **9** | `get` | List Outlook events in the date window (default ~7 days back … 60 ahead) |
-| **10** | `sync --dry-run` | Preview without writing to Google |
-| **11** | `sync` | Copy events into Google Calendar |
-| **1** | `gui` | Desktop app (needs Tk) |
+Then run `python -m syncer` again and pick **11** to copy those Outlook events into your Google Calendar. If Google acts up in the middle, you may need the personal VPN again.
 
-If **9** shows events, Exchange is probably fine. Use **11** to write to Google.
-
-Good luck.
+Good luck!
