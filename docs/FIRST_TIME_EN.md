@@ -4,11 +4,19 @@ Step-by-step for people setting up Outlook/Exchange → Google Calendar sync on 
 
 فارسی: [راهنمای نصب اولیه](FIRST_TIME_FA.md)
 
-> **VPN tip**
+> **Internet & VPN (Iran)**
 >
-> - For **Google Cloud** and Gmail sign-in you usually need normal internet (turn off a company VPN that blocks Google, or use split tunneling).
-> - For the **work mailbox** (for example `mail.digikala.com`) the **company VPN** must be on.
-> - If a personal VPN breaks access to the company mail server, turn that personal VPN off for the Exchange steps.
+> Keep these two modes separate:
+>
+> 1. **Personal VPN / unblocked internet** is required for (plain Iranian internet often fails):
+>    - Installing Homebrew and Python
+>    - `git clone` and `pip install`
+>    - Google Cloud Console, downloading `credentials.json`, and Gmail sign-in
+> 2. **Company mail** (e.g. `mail.digikala.com`):
+>    - Turn **off** your personal VPN
+>    - Turn **on** the company VPN, **or** join Wi‑Fi where the company mailbox opens
+>
+> If the company VPN blocks Google/Homebrew, switch back to a personal VPN for those steps (or use split tunneling if you have it).
 
 Windows / Linux users: use the [README Quick start](../README.md#quick-start); the Google + Exchange wizard (`python -m syncer setup`) is the same idea.
 
@@ -16,7 +24,7 @@ Windows / Linux users: use the [README Quick start](../README.md#quick-start); t
 
 ## 1. Terminal and Homebrew
 
-Open **Terminal**.
+Open **Terminal**. Turn on a **personal VPN** before installing Homebrew/Python (unfiltered internet; plain Iranian connectivity often is not enough).
 
 If Homebrew is not installed:
 
@@ -52,6 +60,8 @@ cd outlook-to-gmail-calendar-syncer
 
 ## 3. Virtualenv and dependencies
 
+Keep the **personal VPN** on so `pip` can download packages.
+
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -63,6 +73,8 @@ Wait until pip finishes. Later sessions: activate `.venv` again from this projec
 ---
 
 ## 4. Setup wizard
+
+Do the Google Cloud and Gmail steps with a **personal VPN** (internet that can reach Google).
 
 ```bash
 python -m syncer setup
@@ -168,7 +180,10 @@ Then:
 Save the Exchange password in the system keyring now? [Y/n]:
 ```
 
-**`Y`** → Enter. Turn the **company VPN** on for mail access.
+**`Y`** → Enter. For saving the password and testing Exchange:
+
+1. Turn **off** the personal VPN  
+2. Turn **on** the company VPN, **or** join office Wi‑Fi / a network where company mail works  
 
 ```text
 Password for you@company.com:
@@ -180,7 +195,7 @@ Type the password (characters usually stay hidden) → Enter.
 Open the Google sign-in now to test Calendar access? [Y/n]:
 ```
 
-**`Y`** → Enter. Use normal internet if the company VPN blocks Google. Pick your personal Gmail → **Continue**. When done:
+**`Y`** → Enter. For this step you need a **personal VPN** again so Gmail opens. Pick your personal Gmail → **Continue**. When done:
 
 ```text
 Setup finished.
@@ -189,6 +204,8 @@ Setup finished.
 ---
 
 ## 6. Day-to-day use
+
+For **Outlook get / sync**, use the company VPN (or office Wi‑Fi). For Gmail/token issues, switch back to a personal VPN. Each time:
 
 ```bash
 cd ~/Desktop/outlook-to-gmail/outlook-to-gmail-calendar-syncer

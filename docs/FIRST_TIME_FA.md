@@ -4,17 +4,25 @@
 
 اگر انگلیسی راحت‌ترید: [First-time guide (English)](FIRST_TIME_EN.md)
 
-> **نکته VPN**
+> **نکته اینترنت و VPN (ایران)**
 >
-> - برای مراحل **Google Cloud** و ورود به Gmail معمولاً اینترنت عادی لازم است (اگر VPN شرکتی گوگل را می‌بندد، موقتاً خاموشش کنید یا split tunnel بگیرید).
-> - برای اتصال به **ایمیل کاری** (مثلاً `mail.digikala.com`) باید **VPN شرکت** روشن باشد.
-> - اگر یک VPN شخصی/متفرقه دارید که دسترسی به سرور ایمیل شرکت را خراب می‌کند، آن را برای مرحلهٔ Exchange خاموش کنید.
+> دو حالت جدا دارید — قاطی‌شان نکنید:
+>
+> 1. **اینترنت با VPN شخصی** برای این کارها لازم است (اینترنت عادی ایران اغلب کافی نیست):
+>    - نصب Homebrew و Python
+>    - `git clone` و `pip install`
+>    - باز کردن Google Cloud Console، دانلود `credentials.json`، و ورود به Gmail
+> 2. **دسترسی به ایمیل شرکتی** (مثلاً `mail.digikala.com`):
+>    - VPN شخصی را **خاموش** کنید
+>    - VPN شرکت را **روشن** کنید، یا به وای‌فایی وصل شوید که ایمیل شرکت روی آن باز می‌شود
+>
+> اگر VPN شرکت گوگل/Homebrew را می‌بندد، برای آن مراحل دوباره VPN شخصی را روشن کنید (یا از split tunnel استفاده کنید اگر دارید).
 
 ---
 
 ## ۱. آماده‌سازی Terminal و Homebrew
 
-برنامهٔ **Terminal** را باز کنید.
+برنامهٔ **Terminal** را باز کنید. برای نصب Homebrew و Python، **VPN شخصی** را روشن کنید (اینترنت بدون VPN در ایران ممکن است کار نکند).
 
 اگر Homebrew ندارید:
 
@@ -57,6 +65,8 @@ cd outlook-to-gmail-calendar-syncer
 
 ## ۳. محیط مجازی و نصب وابستگی‌ها
 
+هنوز **VPN شخصی** روشن باشد تا `pip` بتواند پکیج‌ها را دانلود کند.
+
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -68,6 +78,8 @@ pip install -r requirements.txt
 ---
 
 ## ۴. ویزارد اولیه (`setup`)
+
+مراحل Google Cloud و Gmail را با **VPN شخصی** (اینترنت باز به گوگل) انجام دهید.
 
 ```bash
 python -m syncer setup
@@ -181,7 +193,10 @@ Save the Exchange password in the system keyring now? [Y/n]:
 
 **`Y`** و Enter.
 
-اکنون **VPN شرکت** را برای دسترسی به سرور ایمیل روشن کنید (و اگر VPN شخصی راه را می‌بندد، آن را خاموش کنید).
+اکنون برای ذخیرهٔ رمز و تست Exchange:
+
+1. VPN شخصی را **خاموش** کنید  
+2. VPN شرکت را **روشن** کنید، یا به وای‌فای شرکت / شبکه‌ای وصل شوید که ایمیل کاری روی آن باز است  
 
 ```text
 Password for you@company.com:
@@ -193,7 +208,7 @@ Password for you@company.com:
 Open the Google sign-in now to test Calendar access? [Y/n]:
 ```
 
-**`Y`** و Enter. اگر VPN شرکتی گوگل را می‌بندد، برای این مرحله اینترنت عادی لازم است. در مرورگر Gmail شخصی را انتخاب کنید → **Continue**. بعد از موفقیت:
+**`Y`** و Enter. برای این مرحله دوباره به اینترنت با **VPN شخصی** نیاز دارید تا Gmail باز شود. در مرورگر Gmail شخصی را انتخاب کنید → **Continue**. بعد از موفقیت:
 
 ```text
 Setup finished.
@@ -203,7 +218,7 @@ Setup finished.
 
 ## ۶. استفادهٔ روزمره
 
-هر بار:
+برای **خواندن Outlook / sync** معمولاً VPN شرکت (یا وای‌فای شرکت) لازم است؛ برای مشکلات Gmail/توکن دوباره VPN شخصی. هر بار:
 
 ```bash
 cd ~/Desktop/outlook-to-gmail/outlook-to-gmail-calendar-syncer
