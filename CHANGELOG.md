@@ -5,6 +5,10 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 ## Unreleased
 
+### Added
+
+- First-time setup guides: [docs/FIRST_TIME_EN.md](docs/FIRST_TIME_EN.md) and [docs/FIRST_TIME_FA.md](docs/FIRST_TIME_FA.md) (linked from the README)
+
 ## 0.3.0 — 2026-10-11
 
 ### Added

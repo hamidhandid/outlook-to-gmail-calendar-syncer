@@ -8,6 +8,13 @@ Apple Mail is not required. Attendees are not copied, so coworkers do not get ex
 
 This is a **personal** tool. Check with IT before copying a work calendar to a personal Google account.
 
+## First-time guides
+
+If you are new to Terminal / Google Cloud, follow the step-by-step guide (macOS):
+
+- **English:** [docs/FIRST_TIME_EN.md](docs/FIRST_TIME_EN.md)
+- **فارسی:** [docs/FIRST_TIME_FA.md](docs/FIRST_TIME_FA.md)
+
 ## Quick start
 
 Python **3.11+**.
