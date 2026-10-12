@@ -5,9 +5,19 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 ## Unreleased
 
+## 0.4.0 — 2026-10-12
+
 ### Added
 
+- `python -m syncer store` — fetch Outlook/Exchange events and save them to a password-encrypted file (`events.enc` by default)
+- `python -m syncer sync-stored` — decrypt that file later and sync to Google Calendar (no Outlook/VPN needed for the fetch step)
+- Optional `--dry-run` for `sync-stored`; override paths with `-o` / `-i`; password via prompt or `SYNCER_STORE_PASSWORD`
 - First-time setup guides: [docs/FIRST_TIME_EN.md](docs/FIRST_TIME_EN.md) and [docs/FIRST_TIME_FA.md](docs/FIRST_TIME_FA.md) (linked from the README)
+
+### Notes
+
+- Existing `get` / `sync` / schedule behaviour is unchanged
+- Encryption uses Fernet (AES) with PBKDF2-SHA256; keep the password — lost passwords cannot recover the file
 
 ## 0.3.0 — 2026-10-11
 

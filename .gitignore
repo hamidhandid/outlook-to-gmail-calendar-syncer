@@ -8,6 +8,8 @@ config.yaml
 credentials.json
 credentials.PLACEHOLDER.json
 token.json
+events.enc
+*.enc
 logs/
 .DS_Store
 dist/

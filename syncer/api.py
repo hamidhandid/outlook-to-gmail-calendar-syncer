@@ -3,8 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 
 from .config import ConfigError, Settings, load_settings
+from .encrypted_store import (
+    default_store_path,
+    load_encrypted_events,
+    save_encrypted_events,
+)
 from .google import (
     check_google_token,
     clear_google_token,
@@ -49,6 +55,14 @@ class SyncResult:
     deleted: int = 0
     unchanged: int = 0
     dry_run: bool = False
+
+
+@dataclass
+class StoreResult:
+    ok: bool
+    message: str = ""
+    path: Path | None = None
+    count: int = 0
 
 
 @dataclass
@@ -115,6 +129,8 @@ def run_sync(
     settings: Settings | None = None,
     *,
     events: list[SourceEvent] | None = None,
+    window_start: datetime | None = None,
+    window_end: datetime | None = None,
     dry_run: bool = False,
     log: LogFn | None = None,
     cancel: CancelEvent | None = None,
@@ -125,7 +141,9 @@ def run_sync(
         _log(log, "error", str(exc))
         return SyncResult(ok=False, message=str(exc), dry_run=dry_run)
 
-    window_start, window_end = default_window(settings.days_back, settings.days_forward)
+    default_start, default_end = default_window(settings.days_back, settings.days_forward)
+    sync_start = window_start or default_start
+    sync_end = window_end or default_end
     try:
         if events is None:
             get = get_events(settings, log=log, cancel=cancel)
@@ -133,7 +151,7 @@ def run_sync(
                 return SyncResult(ok=False, message=get.message, dry_run=dry_run)
             events = get.events
             if get.window_start and get.window_end:
-                window_start, window_end = get.window_start, get.window_end
+                sync_start, sync_end = get.window_start, get.window_end
 
         tz = detect_timezone(settings.timezone)
         _log(log, "info", "Connecting to Google Calendar…")
@@ -163,8 +181,8 @@ def run_sync(
             service=service,
             calendar_id=calendar_id,
             by_origin=by_origin,
-            window_start=window_start,
-            window_end=window_end,
+            window_start=sync_start,
+            window_end=sync_end,
             tz=tz,
             dry_run=dry_run,
             log=log,
@@ -204,6 +222,100 @@ def run_sync(
         deleted=counts["deleted"],
         unchanged=counts["unchanged"],
         dry_run=dry_run,
+    )
+
+
+def store_events_encrypted(
+    settings: Settings | None = None,
+    *,
+    path: Path | None = None,
+    password: str | None = None,
+    log: LogFn | None = None,
+    cancel: CancelEvent | None = None,
+) -> StoreResult:
+    """Fetch Outlook/Exchange events and write them to a password-encrypted file."""
+    try:
+        settings = settings or load_settings()
+    except ConfigError as exc:
+        _log(log, "error", str(exc))
+        return StoreResult(ok=False, message=str(exc))
+
+    get = get_events(settings, log=log, cancel=cancel)
+    if not get.ok:
+        return StoreResult(ok=False, message=get.message)
+    assert get.window_start is not None and get.window_end is not None
+
+    target = path or default_store_path()
+    try:
+        saved = save_encrypted_events(
+            get.events,
+            path=target,
+            privacy=settings.privacy,
+            window_start=get.window_start,
+            window_end=get.window_end,
+            password=password,
+        )
+    except SystemExit as exc:
+        msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+        _log(log, "error", msg)
+        return StoreResult(ok=False, message=msg)
+    except Exception as exc:
+        msg = f"Failed to write encrypted events file: {exc}"
+        _log(log, "error", msg)
+        return StoreResult(ok=False, message=msg)
+
+    msg = (
+        f"Saved {len(get.events)} event(s) encrypted to {saved}\n"
+        f"Window: {get.window_start.date()} → {get.window_end.date()}\n"
+        "Later (no company VPN needed for Outlook): python -m syncer sync-stored"
+    )
+    _log(log, "success", msg)
+    return StoreResult(ok=True, message=msg, path=saved, count=len(get.events))
+
+
+def run_sync_from_encrypted(
+    settings: Settings | None = None,
+    *,
+    path: Path | None = None,
+    password: str | None = None,
+    dry_run: bool = False,
+    log: LogFn | None = None,
+    cancel: CancelEvent | None = None,
+) -> SyncResult:
+    """Decrypt a previously stored events file and sync it to Google Calendar."""
+    try:
+        settings = settings or load_settings()
+    except ConfigError as exc:
+        _log(log, "error", str(exc))
+        return SyncResult(ok=False, message=str(exc), dry_run=dry_run)
+
+    source = path or default_store_path()
+    try:
+        bundle = load_encrypted_events(source, password=password)
+    except SystemExit as exc:
+        msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+        _log(log, "error", msg)
+        return SyncResult(ok=False, message=msg, dry_run=dry_run)
+    except Exception as exc:
+        msg = f"Failed to read encrypted events file: {exc}"
+        _log(log, "error", msg)
+        return SyncResult(ok=False, message=msg, dry_run=dry_run)
+
+    _log(
+        log,
+        "info",
+        f"Loaded {len(bundle.events)} event(s) from {bundle.path} "
+        f"(saved {bundle.created_at.isoformat(timespec='seconds')}, "
+        f"window {bundle.window_start.date()} → {bundle.window_end.date()})",
+    )
+    return run_sync(
+        settings,
+        events=bundle.events,
+        window_start=bundle.window_start,
+        window_end=bundle.window_end,
+        dry_run=dry_run,
+        log=log,
+        cancel=cancel,
     )
 
 

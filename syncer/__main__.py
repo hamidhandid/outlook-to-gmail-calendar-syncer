@@ -4,6 +4,8 @@ import argparse
 import sys
 from textwrap import dedent
 
+from pathlib import Path
+
 from .api import (
     check_tokens_status,
     format_event_row,
@@ -11,8 +13,11 @@ from .api import (
     login_exchange,
     reauth_google,
     run_sync,
+    run_sync_from_encrypted,
+    store_events_encrypted,
 )
 from .config import ConfigError, load_settings
+from .encrypted_store import default_store_path
 from .schedule import install_schedule, uninstall_schedule
 
 MENU_ACTIONS = [
@@ -29,6 +34,10 @@ MENU_ACTIONS = [
     ("sync", "Copy Outlook events into Google Calendar"),
     ("install-schedule", "Run sync every 15 minutes (launchd / Task Scheduler / systemd)"),
     ("uninstall-schedule", "Stop the background schedule"),
+    # New options stay at the end so existing menu numbers do not shift.
+    ("store", "Fetch Outlook events and save them to an encrypted file"),
+    ("sync-stored --dry-run", "Preview sync from the encrypted file (no Outlook fetch)"),
+    ("sync-stored", "Sync Google Calendar from a previously encrypted events file"),
 ]
 
 
@@ -134,8 +143,26 @@ def cmd_get() -> None:
         print(f"  {format_event_row(event, settings.privacy, settings.timezone)}")
 
 
+def cmd_store(*, output: Path | None) -> None:
+    settings = _settings()
+    result = store_events_encrypted(settings, path=output)
+    if not result.ok:
+        raise SystemExit(result.message)
+    print(result.message)
+
+
 def cmd_sync(*, dry_run: bool) -> None:
     result = run_sync(_settings(), dry_run=dry_run)
+    if not result.ok:
+        raise SystemExit(result.message)
+
+
+def cmd_sync_stored(*, input_path: Path | None, dry_run: bool) -> None:
+    result = run_sync_from_encrypted(
+        _settings(),
+        path=input_path,
+        dry_run=dry_run,
+    )
     if not result.ok:
         raise SystemExit(result.message)
 
@@ -223,8 +250,12 @@ def dispatch(args: argparse.Namespace) -> None:
         cmd_check()
     elif args.command == "get":
         cmd_get()
+    elif args.command == "store":
+        cmd_store(output=args.output)
     elif args.command == "sync":
         cmd_sync(dry_run=args.dry_run)
+    elif args.command == "sync-stored":
+        cmd_sync_stored(input_path=args.input, dry_run=args.dry_run)
     elif args.command == "install-schedule":
         install_schedule()
     elif args.command == "uninstall-schedule":
@@ -275,8 +306,35 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("list-calendars", help="Show Exchange or Apple calendar names.")
     sub.add_parser("check", help="Verify Exchange/Calendar access, config, and Google login.")
     sub.add_parser("get", help="List Outlook events in the configured date window.")
+    store_p = sub.add_parser(
+        "store",
+        help="Fetch Outlook events and save them to a password-encrypted file (default: events.enc).",
+    )
+    store_p.add_argument(
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
+        help=f"Output path (default: {default_store_path()})",
+    )
     sync_p = sub.add_parser("sync", help="Copy Outlook events into Google Calendar.")
     sync_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print what would change without writing to Google.",
+    )
+    sync_stored_p = sub.add_parser(
+        "sync-stored",
+        help="Decrypt a previously stored events file and sync it to Google Calendar.",
+    )
+    sync_stored_p.add_argument(
+        "-i",
+        "--input",
+        type=Path,
+        default=None,
+        help=f"Encrypted file path (default: {default_store_path()})",
+    )
+    sync_stored_p.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would change without writing to Google.",

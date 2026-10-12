@@ -96,10 +96,22 @@ python -m syncer tokens
 python -m syncer get              # list events in the configured date window
 python -m syncer sync --dry-run
 python -m syncer sync
+# optional offline path (company VPN for store, Google later without Outlook):
+# python -m syncer store
+# python -m syncer sync-stored
 python -m syncer install-schedule # optional, every 15 minutes
 ```
 
 Events appear in Google Calendar under the name you chose (default **Work (Outlook)**).
+
+### Encrypted offline hand-off
+
+Use this when you can reach Exchange now but want to sync to Google later (or on another network):
+
+1. With company VPN: `python -m syncer store` — prompts for a password and writes `events.enc` (gitignored).
+2. Later, with Google reachable: `python -m syncer sync-stored` — same password, then syncs to Google.
+
+Optional: `-o` / `-i` for a custom path, `--dry-run` on `sync-stored`, or `SYNCER_STORE_PASSWORD` to avoid the prompt. Existing `get` / `sync` are unchanged.
 
 ## Config
 
@@ -135,10 +147,13 @@ CLI and GUI share `syncer.api` (`get_events`, `run_sync`, …).
 | `python -m syncer reauth-google` | Delete `token.json` and sign in to Google again |
 | `python -m syncer tokens` | Check Exchange + Google token / login status |
 | `python -m syncer get` | List Outlook events in the date window |
+| `python -m syncer store` | Fetch Outlook events into encrypted `events.enc` |
 | `python -m syncer list-calendars` | List Exchange (or Apple on macOS) calendars |
 | `python -m syncer check` | Test Exchange + Google login |
-| `python -m syncer sync` | Copy events |
+| `python -m syncer sync` | Copy events (live from Outlook) |
 | `python -m syncer sync --dry-run` | Preview without writing to Google |
+| `python -m syncer sync-stored` | Sync Google from a previously encrypted file |
+| `python -m syncer sync-stored --dry-run` | Preview sync from the encrypted file |
 | `python -m syncer install-schedule` | Schedule every 15 minutes (see below) |
 | `python -m syncer uninstall-schedule` | Remove the background schedule |
 
@@ -200,7 +215,7 @@ python -m syncer sync
 ## Versioning & releases
 
 - Current version: see [`VERSION`](VERSION) (also `python -m syncer --version`).
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.3.0`).
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.4.0`).
 - Tag locally after bumping `VERSION` + changelog, then push the tag and attach build artifacts on GitHub Releases.
 
 ## License

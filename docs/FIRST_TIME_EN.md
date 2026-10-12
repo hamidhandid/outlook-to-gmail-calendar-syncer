@@ -266,4 +266,6 @@ You’ll get a numbered menu. For example, number **9** shows your events (by de
 
 Then run `python -m syncer` again and pick **11** to copy those Outlook events into your Google Calendar. If Google acts up in the middle, you may need the personal VPN again.
 
+If you can reach company mail now but want to sync to Google later: use **14** (`store`) to save events into a password-encrypted file, then later use **16** (`sync-stored`) to push that file to Google Calendar (no second Outlook fetch).
+
 Good luck!
