@@ -7,11 +7,13 @@ from textwrap import dedent
 from pathlib import Path
 
 from .api import (
-    check_tokens_status,
+    check_google_auth,
+    check_outlook_auth,
     format_event_row,
     get_events,
     login_exchange,
     reauth_google,
+    reset_credentials_and_calendar,
     run_sync,
     run_sync_from_encrypted,
     store_events_encrypted,
@@ -24,12 +26,12 @@ MENU_ACTIONS = [
     ("gui", "Open the graphical app"),
     ("setup", "Interactive Google Cloud + config wizard"),
     ("setup --google-only", "Google OAuth client only"),
-    ("login", "Save / update Exchange password in the system keyring"),
+    ("login-to-outlook", "Save / update Exchange password in the system keyring"),
     ("reauth-google", "Delete Google token and sign in again"),
-    ("tokens", "Check Exchange + Google token / login status"),
+    ("check-outlook-auth", "Check Outlook / Exchange login"),
     ("list-calendars", "List Exchange or Apple calendars"),
-    ("check", "Verify config, Exchange, and Google login"),
-    ("get", "List Outlook events in the configured date window"),
+    ("check-google-auth", "Check Google OAuth / token status"),
+    ("show-outlook-events", "List Outlook events in the configured date window"),
     ("sync --dry-run", "Preview sync without writing to Google"),
     ("sync", "Copy Outlook events into Google Calendar"),
     ("install-schedule", "Run sync every 15 minutes (launchd / Task Scheduler / systemd)"),
@@ -38,6 +40,7 @@ MENU_ACTIONS = [
     ("store", "Fetch Outlook events and save them to an encrypted file"),
     ("sync-stored --dry-run", "Preview sync from the encrypted file (no Outlook fetch)"),
     ("sync-stored", "Sync Google Calendar from a previously encrypted events file"),
+    ("reset", "Delete Google sync calendar + all Outlook/Google credentials (asks first)"),
 ]
 
 
@@ -88,49 +91,34 @@ def cmd_reauth_google() -> None:
     print(msg)
 
 
-def cmd_tokens() -> None:
+def cmd_check_outlook_auth() -> None:
     settings = _settings()
-    print("Token / login status\n")
     print(f"config: {settings.config_path}")
     print(f"source: {settings.source}")
-    print()
-    result = check_tokens_status(settings)
-    print(f"Exchange: {'OK' if result.exchange_ok else 'FAIL'}")
-    print(f"  {result.exchange_message}")
-    if not result.exchange_ok:
-        print("  Fix: python -m syncer login")
-    print()
-    print(f"Google:   {'OK' if result.google_ok else 'FAIL'}")
-    print(f"  {result.google_message}")
+    ok, msg = check_outlook_auth(settings)
+    print(f"Outlook: {'OK' if ok else 'FAIL'}")
+    print(f"  {msg}")
+    if not ok:
+        print("  Fix: python -m syncer login-to-outlook")
+        raise SystemExit(1)
+
+
+def cmd_check_google_auth() -> None:
+    settings = _settings()
+    print(f"config: {settings.config_path}")
     if settings.credentials_path.exists():
-        print(f"  client: {settings.credentials_path}")
+        print(f"client: {settings.credentials_path}")
     if settings.token_path.exists():
-        print(f"  token:  {settings.token_path}")
-    if not result.google_ok:
+        print(f"token:  {settings.token_path}")
+    ok, msg = check_google_auth(settings)
+    print(f"Google: {'OK' if ok else 'FAIL'}")
+    print(f"  {msg}")
+    if not ok:
         print("  Fix: python -m syncer reauth-google")
         print(
             "  Note: OAuth apps left in Testing expire refresh tokens after ~7 days."
         )
-    print()
-    if result.ok:
-        print("Both look good. Run: python -m syncer sync")
-    else:
         raise SystemExit(1)
-
-
-def cmd_check() -> None:
-    settings = _settings()
-    print(f"config: {settings.config_path}")
-    print(f"source: {settings.source}")
-    if not settings.credentials_path.exists():
-        raise SystemExit(
-            "Missing credentials.json. Run: python -m syncer setup --google-only"
-        )
-    print(f"google oauth client: {settings.credentials_path}")
-    result = check_tokens_status(settings)
-    if not result.ok:
-        raise SystemExit(result.message)
-    print("Ready. Run: python -m syncer sync")
 
 
 def cmd_get() -> None:
@@ -165,6 +153,39 @@ def cmd_sync_stored(*, input_path: Path | None, dry_run: bool) -> None:
     )
     if not result.ok:
         raise SystemExit(result.message)
+
+
+def cmd_reset(*, yes: bool, keep_calendar: bool) -> None:
+    try:
+        settings = load_settings()
+        cal_name = settings.google_calendar
+        email = settings.ews.email if settings.ews else "(unknown)"
+    except ConfigError:
+        settings = None
+        cal_name = "Work (Outlook)"
+        email = "(from config if present)"
+
+    print(
+        "WARNING: This will permanently remove:\n"
+        f"  • Google Calendar named {cal_name!r} (unless --keep-calendar)\n"
+        "  • credentials.json and token.json (Google OAuth)\n"
+        "  • events.enc (encrypted Outlook snapshot), if present\n"
+        f"  • Exchange password for {email} from the OS keyring\n"
+        "\n"
+        "config.yaml is NOT deleted.\n"
+    )
+    if not yes:
+        answer = input('Type DELETE to confirm (or press Enter to cancel): ').strip()
+        if answer != "DELETE":
+            raise SystemExit("Reset cancelled.")
+    result = reset_credentials_and_calendar(
+        settings,
+        delete_google_calendar=not keep_calendar,
+        confirmed=True,
+    )
+    print(result.message)
+    if not result.ok:
+        raise SystemExit(1)
 
 
 def cmd_gui() -> None:
@@ -238,17 +259,17 @@ def dispatch(args: argparse.Namespace) -> None:
         from .wizard import run_wizard
 
         run_wizard(google_only=args.google_only)
-    elif args.command == "login":
+    elif args.command == "login-to-outlook":
         cmd_login()
     elif args.command == "reauth-google":
         cmd_reauth_google()
-    elif args.command == "tokens":
-        cmd_tokens()
+    elif args.command == "check-outlook-auth":
+        cmd_check_outlook_auth()
     elif args.command == "list-calendars":
         cmd_list_calendars()
-    elif args.command == "check":
-        cmd_check()
-    elif args.command == "get":
+    elif args.command == "check-google-auth":
+        cmd_check_google_auth()
+    elif args.command == "show-outlook-events":
         cmd_get()
     elif args.command == "store":
         cmd_store(output=args.output)
@@ -256,6 +277,8 @@ def dispatch(args: argparse.Namespace) -> None:
         cmd_sync(dry_run=args.dry_run)
     elif args.command == "sync-stored":
         cmd_sync_stored(input_path=args.input, dry_run=args.dry_run)
+    elif args.command == "reset":
+        cmd_reset(yes=args.yes, keep_calendar=args.keep_calendar)
     elif args.command == "install-schedule":
         install_schedule()
     elif args.command == "uninstall-schedule":
@@ -283,7 +306,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("gui", help="Open the CustomTkinter desktop app.")
     sub.add_parser(
-        "login",
+        "login-to-outlook",
         help="Save Exchange password in the system keyring and test the login.",
     )
     sub.add_parser(
@@ -291,8 +314,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Delete token.json and open a browser to sign in to Google again.",
     )
     sub.add_parser(
-        "tokens",
-        help="Check whether Exchange and Google logins/tokens are still valid.",
+        "check-outlook-auth",
+        help="Test Outlook / Exchange login with the saved password.",
     )
     setup_p = sub.add_parser(
         "setup",
@@ -304,8 +327,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only walk through creating the Google OAuth client.",
     )
     sub.add_parser("list-calendars", help="Show Exchange or Apple calendar names.")
-    sub.add_parser("check", help="Verify Exchange/Calendar access, config, and Google login.")
-    sub.add_parser("get", help="List Outlook events in the configured date window.")
+    sub.add_parser(
+        "check-google-auth",
+        help="Test Google OAuth credentials and token.json.",
+    )
+    sub.add_parser(
+        "show-outlook-events",
+        help="List Outlook events in the configured date window.",
+    )
     store_p = sub.add_parser(
         "store",
         help="Fetch Outlook events and save them to a password-encrypted file (default: events.enc).",
@@ -344,6 +373,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run sync every 15 minutes (macOS launchd, Windows Task Scheduler, or Linux systemd --user).",
     )
     sub.add_parser("uninstall-schedule", help="Stop the background schedule.")
+    reset_p = sub.add_parser(
+        "reset",
+        help=(
+            "Delete the Google sync calendar and wipe Outlook/Google credentials "
+            "(requires typing DELETE unless --yes)."
+        ),
+    )
+    reset_p.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the interactive DELETE confirmation (still destructive).",
+    )
+    reset_p.add_argument(
+        "--keep-calendar",
+        action="store_true",
+        help="Do not delete the Google Calendar; only wipe local credentials/tokens.",
+    )
     return parser
 
 

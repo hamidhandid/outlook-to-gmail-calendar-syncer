@@ -45,13 +45,43 @@ def password_for(email: str) -> str:
         return stored
     raise SystemExit(
         "No Exchange password saved. Connect the VPN, then run:\n"
-        "  python -m syncer login\n"
+        "  python -m syncer login-to-outlook\n"
         "Or set the EWS_PASSWORD environment variable."
     )
 
 
+def has_stored_password(email: str) -> bool:
+    """True if an Exchange password is available (keyring or EWS_PASSWORD)."""
+    email = (email or "").strip()
+    if os.environ.get("EWS_PASSWORD", "").strip():
+        return True
+    if not email:
+        return False
+    try:
+        return keyring.get_password(KEYRING_SERVICE, email) is not None
+    except Exception:
+        return False
+
+
 def save_password(email: str, password: str) -> None:
     keyring.set_password(KEYRING_SERVICE, email, password)
+
+
+def clear_password(email: str) -> bool:
+    """Remove the Exchange password from the OS keyring. Returns True if something was deleted."""
+    email = (email or "").strip()
+    if not email:
+        return False
+    try:
+        if keyring.get_password(KEYRING_SERVICE, email) is None:
+            return False
+    except Exception:
+        pass
+    try:
+        keyring.delete_password(KEYRING_SERVICE, email)
+        return True
+    except Exception:
+        return False
 
 
 def prompt_and_save_password(email: str) -> str:
@@ -112,7 +142,8 @@ def connect(settings: EwsSettings, password: str | None = None) -> Account:
         BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
         warnings.filterwarnings("ignore", category=InsecureRequestWarning)
     secret = password or password_for(settings.email)
-    credentials = Credentials(username=settings.username, password=secret)
+    username = settings.username.strip() or settings.email
+    credentials = Credentials(username=username, password=secret)
     config = Configuration(
         server=settings.server,
         credentials=credentials,
@@ -150,7 +181,7 @@ def connect(settings: EwsSettings, password: str | None = None) -> Account:
     except Exception as exc:
         raise SystemExit(
             f"Exchange login failed ({type(exc).__name__}): {exc}\n"
-            "Connect the VPN and run: python -m syncer login"
+            "Connect the VPN and run: python -m syncer login-to-outlook"
         ) from exc
 
 

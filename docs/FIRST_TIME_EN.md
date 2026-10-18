@@ -149,16 +149,10 @@ Type your work email here. For example `you@digikala.com` or `you@fidibo.com` (d
 Next it asks:
 
 ```text
-Exchange host (from OWA, without https://) [mail.company.com]:
+Exchange host (from OWA, without https://) [mail.digikala.com]:
 ```
 
-For Digikala you can type:
-
-```text
-mail.digikala.com
-```
-
-and press Enter. For username you can leave it empty and just press Enter.
+The default is already `mail.digikala.com` — you can just press Enter. For username you can leave it empty and just press Enter.
 
 If you see:
 
@@ -171,18 +165,18 @@ just press Enter again (leave it on ntlm).
 Then:
 
 ```text
-Verify TLS certificates? Choose n if the company uses an internal CA [Y/n]:
+Verify TLS certificates? Choose n if the company uses an internal CA [y/N]:
 ```
 
-Type **`n`** and press Enter.
+Default is **`n`** — usually just press Enter (unless the server has a public CA cert).
 
 Then:
 
 ```text
-Copy full details (full) or only Busy blocks (busy)? [busy]:
+Copy full details (full) or only Busy blocks (busy)? [full]:
 ```
 
-If you want full event titles and details, type `full` and Enter. If you only want Busy blocks, press Enter or type `busy`.
+Default is **`full`** (titles and details). Type `busy` and Enter if you only want Busy blocks.
 
 Then:
 

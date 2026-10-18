@@ -49,22 +49,23 @@ class Settings:
 def _ews_settings(data: dict) -> EwsSettings:
     raw = data.get("ews") or {}
     email = str(raw.get("email", "")).strip()
-    server = str(raw.get("server", "mail.company.com")).strip()
+    server = str(raw.get("server", "mail.digikala.com")).strip()
     if not email:
         raise ConfigError("config.yaml: set ews.email to your work address")
     if not server:
-        raise ConfigError("config.yaml: set ews.server (for example mail.company.com)")
+        raise ConfigError("config.yaml: set ews.server (for example mail.digikala.com)")
     auth = str(raw.get("auth", "ntlm")).strip().lower()
     if auth not in {"ntlm", "basic"}:
         raise ConfigError("config.yaml: ews.auth must be 'ntlm' or 'basic'")
-    username = str(raw.get("username", "")).strip() or email
+    # Keep empty in config/UI; Exchange connect falls back to email when blank.
+    username = str(raw.get("username", "")).strip()
     return EwsSettings(
         server=server,
         email=email,
         username=username,
         auth=auth,
         calendar=str(raw.get("calendar", "")).strip(),
-        verify_ssl=bool(raw.get("verify_ssl", True)),
+        verify_ssl=bool(raw.get("verify_ssl", False)),
     )
 
 
@@ -126,14 +127,14 @@ def default_config_dict() -> dict[str, Any]:
         "source": "ews",
         "days_back": 7,
         "days_forward": 60,
-        "privacy": "busy",
+        "privacy": "full",
         "ews": {
-            "server": "mail.company.com",
+            "server": "mail.digikala.com",
             "email": "",
             "username": "",
             "auth": "ntlm",
             "calendar": "",
-            "verify_ssl": True,
+            "verify_ssl": False,
         },
         "apple_calendar": "Exchange / Calendar",
         "google_calendar": "Work (Outlook)",
@@ -184,3 +185,30 @@ def load_settings_dict(path: Path | None = None) -> dict[str, Any]:
     if isinstance(data.get("ews"), dict):
         merged["ews"] = {**merged["ews"], **data["ews"]}
     return merged
+
+
+def migrate_legacy_template_defaults(path: Path | None = None) -> list[str]:
+    """Upgrade old shipped template defaults to the current Digikala-oriented ones.
+
+    Only touches configs that still use the old `mail.company.com` template host,
+    so real user customizations are left alone.
+    """
+    config_path = path or CONFIG_PATH
+    notes: list[str] = []
+    if not config_path.exists():
+        return notes
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    ews = dict(data.get("ews") or {}) if isinstance(data.get("ews"), dict) else {}
+    server = str(ews.get("server", "")).strip()
+    if server != "mail.company.com":
+        return notes
+
+    data["privacy"] = "full"
+    ews["server"] = "mail.digikala.com"
+    ews["verify_ssl"] = False
+    data["ews"] = ews
+    save_settings_dict(data, config_path)
+    notes.append(
+        "Updated template defaults → privacy=full, server=mail.digikala.com, verify_ssl=false"
+    )
+    return notes

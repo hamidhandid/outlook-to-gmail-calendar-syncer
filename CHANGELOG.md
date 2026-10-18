@@ -3,7 +3,35 @@
 All notable changes are documented here.  
 GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH` (see `VERSION`).
 
-## Unreleased
+## 0.6.0 — 2026-10-18
+
+### Added
+
+- `python -m syncer reset` — delete the Google sync calendar and wipe Outlook/Google credentials & tokens (type `DELETE` to confirm; `--yes` / `--keep-calendar` optional)
+- GUI **Reset credentials…** (beside **Stop** when any credentials exist) with Confirm / Cancel (does not delete `config.yaml`)
+- GUI top: two sections with a vertical divider — left config (days, email+Outlook auth, server/username, auth/SSL, Save/Import); right Google session (calendar name, Setup/Remove, privacy, Check/Reauth); **Open data folder** beside the data-folder path under the title
+- **List calendars** on the Sync / Sync dry-run row
+- After Google setup: **Remove Google auth** (confirm); right section **Check Google auth** / **Reauth Google**
+- Beside email: **Login to Outlook** or **Check Outlook auth** + **Remove Outlook credential**
+- **Stop** asks for confirmation, then cancels in-progress Get / Sync / Store after the current step
+- GUI **Clear** on the Outlook events and Logs panes (with Confirm / Cancel)
+- GUI confirmations use **Confirm** / **Cancel** only (no typing `DELETE` or other text prompts)
+- After Setup Google / Import credentials (and when Check Google auth finds no token), GUI offers browser sign-in to create `token.json`; button shows **Sign in to Google** until a token exists
+
+### Changed
+
+- Default `privacy` is now `full` (was `busy`)
+- Default Exchange host is now `mail.digikala.com`
+- Default `ews.verify_ssl` is now `false` (GUI checkbox starts unticked)
+- macOS app display name is **Outlook to Google Calendar Syncer** (window title, `.app` bundle, and DMG)
+- GUI layout: fixed overlapping title / data-folder label; regrouped action buttons; Outlook events + Logs panes show ≥4 lines and scroll
+- Teal lead color on Sync and “Show events from outlook” rows only
+- “Show events from outlook” / “Get from outlook and Store encrypted” / “Sync from encrypted file”
+- Setup Google becomes **Google already set up** when `credentials.json` exists
+- Old template configs still on `mail.company.com` are migrated to the new Digikala defaults on launch
+- `ews.username` stays empty in config/UI by default (Exchange uses email when blank)
+- CLI: `tokens` / `check` → `check-outlook-auth` / `check-google-auth`
+- CLI: `login` → `login-to-outlook`; `get` → `show-outlook-events`
 
 ## 0.5.0 — 2026-10-18
 

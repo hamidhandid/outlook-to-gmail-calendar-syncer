@@ -315,7 +315,7 @@ def walk_google_oauth() -> None:
         textwrap.dedent(
             """\
 
-            Later, `python -m syncer check` or `sync` will open a browser.
+            Later, `python -m syncer check-google-auth` or `sync` will open a browser.
             Choose your Gmail. If you see “Google hasn’t verified this app”,
             that is normal: click Advanced → Go to Outlook Calendar Sync
             (unsafe) → Allow.
@@ -380,7 +380,7 @@ def walk_exchange_config() -> None:
     if not email:
         print("Skipping config.yaml. You can copy config.example.yaml later.")
         return
-    server = _ask("Exchange host (from OWA, without https://)", "mail.company.com")
+    server = _ask("Exchange host (from OWA, without https://)", "mail.digikala.com")
     username = _ask(
         "Username (empty = same as email; if login fails try DOMAIN\\account)",
         "",
@@ -390,11 +390,11 @@ def walk_exchange_config() -> None:
         auth = "ntlm"
     verify_ssl = _yes(
         "Verify TLS certificates? Choose n if the company uses an internal CA",
-        default=True,
+        default=False,
     )
-    privacy = _ask("Copy full details (full) or only Busy blocks (busy)?", "busy")
+    privacy = _ask("Copy full details (full) or only Busy blocks (busy)?", "full")
     if privacy not in {"full", "busy"}:
-        privacy = "busy"
+        privacy = "full"
     google_calendar = _ask(
         "Name of the Google calendar to create/use",
         "Work (Outlook)",
@@ -446,7 +446,7 @@ def run_wizard(*, google_only: bool = False) -> None:
     print(
         textwrap.dedent(
             """\
-              python -m syncer login
+              python -m syncer login-to-outlook
               python -m syncer check
               python -m syncer sync --dry-run
               python -m syncer sync

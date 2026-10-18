@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import ConfigError, Settings, load_settings
+from .bootstrap import CREDENTIALS_PLACEHOLDER_PATH, CREDENTIALS_PATH, TOKEN_PATH
 from .encrypted_store import (
     default_store_path,
     load_encrypted_events,
@@ -14,7 +15,9 @@ from .encrypted_store import (
 from .google import (
     check_google_token,
     clear_google_token,
+    delete_calendar,
     detect_timezone,
+    find_calendar_by_name,
     find_or_create_calendar,
     google_service,
 )
@@ -443,6 +446,93 @@ def reauth_google(
         return False, msg
 
 
+def check_outlook_auth(
+    settings: Settings | None = None,
+    *,
+    log: LogFn | None = None,
+) -> tuple[bool, str]:
+    """Test Exchange / Outlook login only."""
+    try:
+        settings = settings or load_settings()
+    except ConfigError as exc:
+        _log(log, "error", str(exc))
+        return False, str(exc)
+    if settings.source != "ews" or settings.ews is None:
+        msg = "Outlook auth check needs source: ews"
+        _log(log, "error", msg)
+        return False, msg
+    from . import ews
+
+    try:
+        account = ews.connect(settings.ews)
+        msg = f"Connected to {settings.ews.server} as {account.primary_smtp_address}"
+        _log(log, "success", msg)
+        return True, msg
+    except SystemExit as exc:
+        msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+        _log(log, "error", msg)
+        return False, msg
+    except Exception as exc:
+        msg = str(exc)
+        _log(log, "error", msg)
+        return False, msg
+
+
+def check_google_auth(
+    settings: Settings | None = None,
+    *,
+    log: LogFn | None = None,
+) -> tuple[bool, str]:
+    """Test Google OAuth token only."""
+    try:
+        settings = settings or load_settings()
+    except ConfigError as exc:
+        _log(log, "error", str(exc))
+        return False, str(exc)
+    ok, msg = check_google_token(settings.credentials_path, settings.token_path)
+    _log(log, "success" if ok else "error", msg)
+    return ok, msg
+
+
+def remove_google_credentials(
+    settings: Settings | None = None,
+    *,
+    confirmed: bool = False,
+    log: LogFn | None = None,
+) -> tuple[bool, str]:
+    """Remove credentials.json and token.json. Does not delete the Google Calendar."""
+    if not confirmed:
+        msg = "Remove cancelled: confirmation required."
+        _log(log, "error", msg)
+        return False, msg
+    try:
+        settings = settings or load_settings()
+        token_path = settings.token_path
+        creds_path = settings.credentials_path
+    except ConfigError:
+        token_path = TOKEN_PATH
+        creds_path = CREDENTIALS_PATH
+
+    steps: list[str] = []
+    for path, label in (
+        (token_path, "token.json"),
+        (creds_path, "credentials.json"),
+        (CREDENTIALS_PLACEHOLDER_PATH, "credentials.PLACEHOLDER.json"),
+    ):
+        try:
+            if path.exists():
+                path.unlink()
+                steps.append(f"Removed {label}")
+                _log(log, "success", steps[-1])
+            else:
+                steps.append(f"{label}: already absent")
+        except OSError as exc:
+            steps.append(f"Could not remove {label}: {exc}")
+            _log(log, "error", steps[-1])
+    summary = "Google credentials removed.\n" + "\n".join(f"  • {s}" for s in steps)
+    return True, summary
+
+
 def format_event_row(event: SourceEvent, privacy: str, timezone: str = "") -> str:
     tz = detect_timezone(timezone)
     title = "Busy" if privacy == "busy" else event.title
@@ -450,3 +540,118 @@ def format_event_row(event: SourceEvent, privacy: str, timezone: str = "") -> st
     end = event.end.astimezone(tz).strftime("%H:%M")
     loc = f" @ {event.location}" if event.location and privacy != "busy" else ""
     return f"{when}–{end}  {title}{loc}"
+
+
+@dataclass
+class ResetResult:
+    ok: bool
+    message: str = ""
+    steps: list[str] = field(default_factory=list)
+
+
+def reset_credentials_and_calendar(
+    settings: Settings | None = None,
+    *,
+    delete_google_calendar: bool = True,
+    confirmed: bool = False,
+    log: LogFn | None = None,
+) -> ResetResult:
+    """Remove Google sync calendar (optional), OAuth files, encrypted store, Exchange password.
+
+    Does **not** delete config.yaml. Requires confirmed=True (caller must warn the user).
+    """
+    if not confirmed:
+        msg = "Reset cancelled: confirmation required."
+        _log(log, "error", msg)
+        return ResetResult(ok=False, message=msg)
+
+    steps: list[str] = []
+    try:
+        settings = settings or load_settings()
+    except ConfigError:
+        settings = None
+
+    # 1) Delete the dedicated Google calendar if we can authenticate.
+    if delete_google_calendar and settings is not None:
+        cal_name = settings.google_calendar
+        if settings.credentials_path.exists() and settings.token_path.exists():
+            try:
+                _log(log, "info", f"Looking up Google calendar {cal_name!r} to delete…")
+                service = google_service(settings.credentials_path, settings.token_path)
+                found = find_calendar_by_name(service, cal_name)
+                if found is None:
+                    steps.append(f"Google calendar {cal_name!r}: not found (skipped)")
+                elif found.get("primary"):
+                    steps.append(
+                        f"Google calendar {cal_name!r}: is primary — not deleted"
+                    )
+                else:
+                    delete_calendar(service, found["id"])
+                    steps.append(f"Deleted Google calendar {cal_name!r} ({found['id']})")
+                    _log(log, "success", steps[-1])
+            except SystemExit as exc:
+                detail = str(exc.code) if isinstance(exc.code, str) else str(exc)
+                steps.append(f"Google calendar delete skipped: {detail}")
+                _log(log, "error", steps[-1])
+            except Exception as exc:
+                steps.append(f"Google calendar delete skipped: {exc}")
+                _log(log, "error", steps[-1])
+        else:
+            steps.append(
+                "Google calendar delete skipped (no credentials.json / token.json yet)"
+            )
+            _log(log, "info", steps[-1])
+
+    # 2) Local Google OAuth files
+    for path, label in (
+        (TOKEN_PATH if settings is None else settings.token_path, "token.json"),
+        (
+            CREDENTIALS_PATH if settings is None else settings.credentials_path,
+            "credentials.json",
+        ),
+        (CREDENTIALS_PLACEHOLDER_PATH, "credentials.PLACEHOLDER.json"),
+    ):
+        try:
+            if path.exists():
+                path.unlink()
+                steps.append(f"Removed {label}")
+                _log(log, "success", steps[-1])
+            else:
+                steps.append(f"{label}: already absent")
+        except OSError as exc:
+            steps.append(f"Could not remove {label}: {exc}")
+            _log(log, "error", steps[-1])
+
+    # 3) Encrypted events store
+    store = default_store_path()
+    try:
+        if store.exists():
+            store.unlink()
+            steps.append(f"Removed {store.name}")
+            _log(log, "success", steps[-1])
+        else:
+            steps.append(f"{store.name}: already absent")
+    except OSError as exc:
+        steps.append(f"Could not remove {store.name}: {exc}")
+        _log(log, "error", steps[-1])
+
+    # 4) Exchange password in OS keyring
+    email = ""
+    if settings is not None and settings.ews is not None:
+        email = settings.ews.email
+    if email:
+        from . import ews
+
+        if ews.clear_password(email):
+            steps.append(f"Removed Exchange password for {email} from the keyring")
+            _log(log, "success", steps[-1])
+        else:
+            steps.append(f"No Exchange password found in the keyring for {email}")
+            _log(log, "info", steps[-1])
+    else:
+        steps.append("Exchange password: skipped (no email in config)")
+        _log(log, "info", steps[-1])
+
+    summary = "Reset finished.\n" + "\n".join(f"  • {s}" for s in steps)
+    _log(log, "success", "Reset finished.")
+    return ResetResult(ok=True, message=summary, steps=steps)

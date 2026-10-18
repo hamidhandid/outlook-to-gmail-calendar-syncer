@@ -135,7 +135,11 @@ def check_google_token(credentials_path: Path, token_path: Path) -> tuple[bool, 
     if not credentials_path.exists():
         return False, "missing credentials.json — run: python -m syncer setup --google-only"
     if not token_path.exists():
-        return False, "no token.json yet — run: python -m syncer reauth-google"
+        return (
+            False,
+            "no token.json yet — click Reauth Google / Sign in to Google "
+            "(or: python -m syncer reauth-google)",
+        )
     try:
         creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
     except Exception as exc:
@@ -197,6 +201,31 @@ def find_or_create_calendar(service: Any, name: str, tz_name: str) -> str:
     except Exception as exc:
         raise _google_network_error(exc) from exc
     return created["id"]
+
+
+def find_calendar_by_name(service: Any, name: str) -> dict[str, Any] | None:
+    try:
+        calendars = _all_pages(
+            lambda token: service.calendarList().list(pageToken=token).execute()
+        )
+    except HttpError:
+        raise
+    except Exception as exc:
+        raise _google_network_error(exc) from exc
+    for item in calendars:
+        if item.get("summary") == name:
+            return item
+    return None
+
+
+def delete_calendar(service: Any, calendar_id: str) -> None:
+    """Permanently delete a secondary Google Calendar (not the primary)."""
+    try:
+        service.calendars().delete(calendarId=calendar_id).execute()
+    except HttpError as exc:
+        raise SystemExit(f"Google Calendar API error while deleting: {exc}") from exc
+    except Exception as exc:
+        raise _google_network_error(exc) from exc
 
 
 def list_synced_events(service: Any, calendar_id: str) -> list[dict[str, Any]]:

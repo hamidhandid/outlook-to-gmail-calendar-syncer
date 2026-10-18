@@ -5,7 +5,14 @@ from pathlib import Path
 
 import yaml
 
-from .config import CONFIG_PATH, EXAMPLE_PATH, ROOT, default_config_dict, load_settings_dict
+from .config import (
+    CONFIG_PATH,
+    EXAMPLE_PATH,
+    ROOT,
+    default_config_dict,
+    load_settings_dict,
+    migrate_legacy_template_defaults,
+)
 
 CREDENTIALS_PATH = ROOT / "credentials.json"
 TOKEN_PATH = ROOT / "token.json"
@@ -28,17 +35,18 @@ def ensure_user_files(*, create_credentials_placeholder: bool = True) -> list[st
     (ROOT / "logs").mkdir(exist_ok=True)
 
     if not CONFIG_PATH.exists():
+        # Prefer programmatic defaults so Digikala-oriented values always apply.
+        CONFIG_PATH.write_text(
+            yaml.safe_dump(default_config_dict(), sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
         if EXAMPLE_PATH.exists():
-            CONFIG_PATH.write_text(EXAMPLE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
-            notes.append(f"Created {CONFIG_PATH.name} from config.example.yaml")
+            notes.append(f"Created {CONFIG_PATH.name} with current defaults")
         else:
-            CONFIG_PATH.write_text(
-                yaml.safe_dump(default_config_dict(), sort_keys=False, allow_unicode=True),
-                encoding="utf-8",
-            )
             notes.append(f"Created {CONFIG_PATH.name} with defaults")
     else:
         _ = load_settings_dict(CONFIG_PATH)
+        notes.extend(migrate_legacy_template_defaults(CONFIG_PATH))
 
     notes.append(f"Data folder: {ROOT}")
 

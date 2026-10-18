@@ -25,8 +25,8 @@ Ordinary Mac users can install a self-contained app from a DMG (Python is bundle
 ./scripts/build_macos_dmg.sh
 ```
 
-2. Share `dist/Outlook-to-Gmail-Syncer-<version>.dmg`.
-3. User opens the DMG → drags **Outlook to Gmail Syncer.app** to Applications → double-clicks.
+2. Share `dist/Outlook-to-Google-Calendar-Syncer-<version>.dmg`.
+3. User opens the DMG → drags **Outlook to Google Calendar Syncer.app** to Applications → double-clicks.
 4. All setup / get / sync / store / schedule actions are buttons in the app.
 
 App data (config, Google tokens, encrypted store) goes to:
@@ -36,7 +36,7 @@ App data (config, Google tokens, encrypted store) goes to:
 Optional CLI using the same binary (still no system Python):
 
 ```bash
-/Applications/Outlook\ to\ Gmail\ Syncer.app/Contents/MacOS/OutlookToGmailSyncer sync --dry-run
+/Applications/Outlook\ to\ Google\ Calendar\ Syncer.app/Contents/MacOS/OutlookToGoogleCalendarSyncer sync --dry-run
 ```
 
 For public downloads, sign and notarize the app/DMG with an Apple Developer ID (the build script prints example commands).
@@ -83,9 +83,9 @@ python -m syncer gui
 
 The desktop app follows the **system light/dark** theme and uses the same core as the CLI:
 
-1. Fill **days_back**, **days_forward**, email, server, privacy, etc. → **Save config** (writes `config.yaml`)
-2. **Login Exchange** / **Reauth Google** / **Check tokens** as needed
-3. **Get** — loads Outlook events into the list (VPN on)
+1. Fill config fields on the left → **Save config** (writes `config.yaml`)
+2. Top-right: **Outlook** (Login / Check auth) and **Google** (Setup / Check auth / Reauth)
+3. **Show events from outlook** — loads Outlook events into the list (VPN on)
 4. **Sync** — enabled after a successful Get; copies those events to Google
 
 **Logs** use green for success and a light red for errors. The status line under the buttons shows whether the last action succeeded.
@@ -117,9 +117,10 @@ If Google says the app is unverified: **Advanced → Go to … (unsafe)**. While
 ## Typical CLI flow (VPN on)
 
 ```bash
-python -m syncer login
-python -m syncer tokens
-python -m syncer get              # list events in the configured date window
+python -m syncer login-to-outlook
+python -m syncer check-outlook-auth
+python -m syncer check-google-auth
+python -m syncer show-outlook-events   # list events in the configured date window
 python -m syncer sync --dry-run
 python -m syncer sync
 # optional offline path (company VPN for store, Google later without Outlook):
@@ -137,7 +138,7 @@ Use this when you can reach Exchange now but want to sync to Google later (or on
 1. With company VPN: `python -m syncer store` — prompts for a password and writes `events.enc` (gitignored).
 2. Later, with Google reachable: `python -m syncer sync-stored` — same password, then syncs to Google.
 
-Optional: `-o` / `-i` for a custom path, `--dry-run` on `sync-stored`, or `SYNCER_STORE_PASSWORD` to avoid the prompt. Existing `get` / `sync` are unchanged.
+Optional: `-o` / `-i` for a custom path, `--dry-run` on `sync-stored`, or `SYNCER_STORE_PASSWORD` to avoid the prompt. Existing `show-outlook-events` / `sync` are unchanged.
 
 ## Config
 
@@ -147,14 +148,14 @@ Optional: `-o` / `-i` for a custom path, `--dry-run` on `sync-stored`, or `SYNCE
 source: ews
 days_back: 7          # midnight UTC, this many days ago
 days_forward: 60      # this many days from now
-privacy: busy         # or full
+privacy: full         # or busy
 ews:
-  server: mail.company.com
+  server: mail.digikala.com
   email: you@company.com
   username: ""        # empty = email; try COMPANY\account if login fails
   auth: ntlm          # or basic
   calendar: ""
-  verify_ssl: true    # false if the server uses an internal certificate
+  verify_ssl: false   # true only if the server has a public CA certificate
 google_calendar: "Work (Outlook)"
 ```
 
@@ -169,19 +170,20 @@ CLI and GUI share `syncer.api` (`get_events`, `run_sync`, …).
 | `python -m syncer gui` | CustomTkinter desktop app |
 | `python -m syncer` | Numbered interactive menu |
 | `python -m syncer setup` | Google Cloud + config wizard |
-| `python -m syncer login` | Save / update Exchange password in the OS keyring |
+| `python -m syncer login-to-outlook` | Save / update Exchange password in the OS keyring |
 | `python -m syncer reauth-google` | Delete `token.json` and sign in to Google again |
-| `python -m syncer tokens` | Check Exchange + Google token / login status |
-| `python -m syncer get` | List Outlook events in the date window |
+| `python -m syncer check-outlook-auth` | Test Outlook / Exchange login |
+| `python -m syncer show-outlook-events` | List Outlook events in the date window |
 | `python -m syncer store` | Fetch Outlook events into encrypted `events.enc` |
 | `python -m syncer list-calendars` | List Exchange (or Apple on macOS) calendars |
-| `python -m syncer check` | Test Exchange + Google login |
+| `python -m syncer check-google-auth` | Test Google OAuth / token |
 | `python -m syncer sync` | Copy events (live from Outlook) |
 | `python -m syncer sync --dry-run` | Preview without writing to Google |
 | `python -m syncer sync-stored` | Sync Google from a previously encrypted file |
 | `python -m syncer sync-stored --dry-run` | Preview sync from the encrypted file |
 | `python -m syncer install-schedule` | Schedule every 15 minutes (see below) |
 | `python -m syncer uninstall-schedule` | Remove the background schedule |
+| `python -m syncer reset` | Delete Google sync calendar + wipe Outlook/Google credentials (asks `DELETE`) |
 
 ### Background schedule by OS
 
@@ -210,7 +212,7 @@ Exchange (VPN) works but **Google is blocked**.
 ## If Google says `invalid_grant` / token expired
 
 ```bash
-python -m syncer tokens
+python -m syncer check-google-auth
 python -m syncer reauth-google
 python -m syncer sync
 ```
@@ -221,7 +223,7 @@ python -m syncer sync
 2. Try `username` as the full email, then as `DOMAIN\account`.  
 3. Try `auth: basic`.  
 4. Set `verify_ssl: false` for a corporate TLS certificate.  
-5. Re-save the password: `python -m syncer login` or GUI **Login Exchange**.
+5. Re-save the password: `python -m syncer login-to-outlook` or GUI **Login to Outlook**.
 
 ## What it will and will not do
 
@@ -241,7 +243,7 @@ python -m syncer sync
 ## Versioning & releases
 
 - Current version: see [`VERSION`](VERSION) (also `python -m syncer --version`).
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.5.0`).
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.6.0`).
 - Tag locally after bumping `VERSION` + changelog, then push the tag and attach build artifacts on GitHub Releases.
 
 ## License

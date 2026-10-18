@@ -6,8 +6,8 @@
 #   ./scripts/build_macos_dmg.sh
 #
 # Output:
-#   dist/Outlook to Gmail Syncer.app
-#   dist/Outlook-to-Gmail-Syncer-<version>.dmg
+#   dist/Outlook to Google Calendar Syncer.app
+#   dist/Outlook-to-Google-Calendar-Syncer-<version>.dmg
 
 set -euo pipefail
 
@@ -15,8 +15,9 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
-APP_NAME="Outlook to Gmail Syncer"
-DMG_NAME="Outlook-to-Gmail-Syncer-${VERSION}.dmg"
+APP_NAME="Outlook to Google Calendar Syncer"
+BIN_NAME="OutlookToGoogleCalendarSyncer"
+DMG_NAME="Outlook-to-Google-Calendar-Syncer-${VERSION}.dmg"
 DIST_DIR="$ROOT/dist"
 BUILD_DIR="$ROOT/build"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/syncer-dmg.XXXXXX")"
@@ -56,7 +57,12 @@ echo "==> Installing build deps (pyinstaller + requirements)…"
 "$PYTHON_BIN" -m pip install -q -r requirements.txt 'pyinstaller>=6.0'
 
 echo "==> Cleaning previous dist/build…"
-rm -rf "$DIST_DIR/OutlookToGmailSyncer" "$DIST_DIR/$APP_NAME.app" "$BUILD_DIR"
+rm -rf \
+  "$DIST_DIR/OutlookToGmailSyncer" \
+  "$DIST_DIR/OutlookToGoogleCalendarSyncer" \
+  "$DIST_DIR/Outlook to Gmail Syncer.app" \
+  "$DIST_DIR/$APP_NAME.app" \
+  "$BUILD_DIR"
 
 echo "==> PyInstaller…"
 "$PYTHON_BIN" -m PyInstaller --noconfirm --clean packaging/macos.spec
@@ -73,7 +79,7 @@ mkdir -p "$STAGE"
 cp -R "$APP_PATH" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 cat > "$STAGE/README.txt" <<EOF
-Outlook → Google Calendar Syncer ${VERSION}
+Outlook to Google Calendar Syncer ${VERSION}
 ===========================================
 
 1. Drag "${APP_NAME}.app" into Applications.
@@ -89,13 +95,13 @@ VPN tip (Iran): personal VPN for Google / first setup; company VPN (or office Wi
 Optional CLI (same binary, no system Python):
   open -a "${APP_NAME}" --args sync --dry-run
   # or:
-  /Applications/${APP_NAME}.app/Contents/MacOS/OutlookToGmailSyncer sync
+  /Applications/${APP_NAME}.app/Contents/MacOS/${BIN_NAME} sync
 EOF
 
 echo "==> Creating $DMG_NAME …"
 rm -f "$DIST_DIR/$DMG_NAME"
 hdiutil create \
-  -volname "Outlook to Gmail Syncer" \
+  -volname "Outlook to Google Calendar Syncer" \
   -srcfolder "$STAGE" \
   -ov \
   -format UDZO \

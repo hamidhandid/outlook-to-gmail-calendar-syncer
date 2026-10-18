@@ -163,16 +163,10 @@ Work email address:
 بعد می‌پرسه:
 
 ```text
-Exchange host (from OWA, without https://) [mail.company.com]:
+Exchange host (from OWA, without https://) [mail.digikala.com]:
 ```
 
-برای دیجی‌کالا می‌تونی بزنی:
-
-```text
-mail.digikala.com
-```
-
-و Enter. بعد تو قسمت username می‌تونی خالی بذاری و فقط Enter بزنی.
+پیش‌فرض `mail.digikala.com` است — می‌تونی فقط Enter بزنی. بعد تو قسمت username می‌تونی خالی بذاری و فقط Enter بزنی.
 
 اگه اومد:
 
@@ -185,18 +179,18 @@ Auth type: ntlm or basic [ntlm]:
 بعد این خط میاد:
 
 ```text
-Verify TLS certificates? Choose n if the company uses an internal CA [Y/n]:
+Verify TLS certificates? Choose n if the company uses an internal CA [y/N]:
 ```
 
-حرف **`n`** رو وارد کن و Enter بزن.
+پیش‌فرض **`n`** است — معمولاً فقط Enter بزن (مگر گواهی عمومی معتبر داشته باشی).
 
 بعد:
 
 ```text
-Copy full details (full) or only Busy blocks (busy)? [busy]:
+Copy full details (full) or only Busy blocks (busy)? [full]:
 ```
 
-اگه می‌خوای عنوان و جزئیات ایونت‌هات کامل بیاد بنویس `full` و Enter. اگه فقط می‌خوای وقتت Busy نشون داده بشه، Enter بزن یا بنویس `busy`.
+پیش‌فرض **`full`** است (عنوان و جزئیات). اگه فقط Busy می‌خوای بنویس `busy` و Enter.
 
 بعد:
 
