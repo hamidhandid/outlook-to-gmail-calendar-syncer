@@ -16,7 +16,14 @@ GOOGLE_CALENDAR_API = (
 GOOGLE_AUTH = "https://console.cloud.google.com/auth/overview"
 GOOGLE_AUDIENCE = "https://console.cloud.google.com/auth/audience"
 GOOGLE_CLIENTS = "https://console.cloud.google.com/auth/clients"
-CREDENTIALS_PATH = ROOT / "credentials.json"
+
+
+def _credentials_path() -> Path:
+    return ROOT / "credentials.json"
+
+
+# Kept for older imports; always points at the writable data dir.
+CREDENTIALS_PATH = _credentials_path()
 
 
 def _hrule() -> None:
@@ -100,6 +107,92 @@ def _copy_credentials() -> bool:
             print(f"Saved {CREDENTIALS_PATH}")
             return True
         print(f"No file at {src}")
+
+
+def walk_google_oauth_gui(*, ask_continue, log=None) -> bool:
+    """Browser-based Google OAuth setup for the GUI (no Terminal input).
+
+    ask_continue(title, message) -> bool should show an OK/Cancel dialog.
+    """
+    def _log(msg: str) -> None:
+        if log:
+            log("info", msg)
+
+    if _credentials_path().exists():
+        if not ask_continue(
+            "Setup Google",
+            "credentials.json already exists.\nContinue and walk through Google Cloud again?",
+        ):
+            return True
+
+    steps = [
+        (
+            "Step 1 — Create a Google Cloud project",
+            "A browser page will open.\n"
+            "1. Project name: outlook-calendar-sync (any name is fine)\n"
+            "2. Click Create\n"
+            "3. Select that project in the top project picker\n\n"
+            "Click OK when done.",
+            GOOGLE_PROJECT,
+        ),
+        (
+            "Step 2 — Enable Calendar API",
+            "Confirm the project name at the top, then click Enable.\n\n"
+            "Click OK when the API is enabled.",
+            GOOGLE_CALENDAR_API,
+        ),
+        (
+            "Step 3 — OAuth consent (Google Auth Platform)",
+            "1. Get started if shown\n"
+            "2. App name: Outlook Calendar Sync\n"
+            "3. User support email: your Gmail\n"
+            "4. Audience: External\n"
+            "5. Contact email: your Gmail\n"
+            "6. Create / Finish\n\n"
+            "Click OK when done.",
+            GOOGLE_AUTH,
+        ),
+        (
+            "Step 4 — Add yourself as a test user",
+            "Under Test users → Add users → your full Gmail → Save.\n\n"
+            "Click OK when done.",
+            GOOGLE_AUDIENCE,
+        ),
+        (
+            "Step 5 — Create a Desktop OAuth client",
+            "1. Create client\n"
+            "2. Application type: Desktop app (not Web)\n"
+            "3. Name: Mac syncer\n"
+            "4. Create → Download JSON\n\n"
+            "Click OK after the JSON is downloaded.",
+            GOOGLE_CLIENTS,
+        ),
+    ]
+    for title, message, url in steps:
+        _log(f"Opening: {url}")
+        try:
+            webbrowser.open(url, new=2)
+        except Exception:
+            pass
+        if not ask_continue(title, message):
+            _log("Google setup cancelled.")
+            return False
+
+    dest = _credentials_path()
+    downloaded = _find_downloaded_json()
+    if downloaded is not None:
+        if ask_continue(
+            "Save credentials.json",
+            f"Found downloaded client file:\n{downloaded}\n\n"
+            f"Copy it to:\n{dest} ?",
+        ):
+            shutil.copy2(downloaded, dest)
+            _log(f"Saved {dest}")
+            return True
+    _log(
+        f"Download finished. Use Import credentials… to save the JSON as:\n{dest}"
+    )
+    return dest.exists()
 
 
 def walk_google_oauth() -> None:

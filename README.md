@@ -15,6 +15,32 @@ If you are new to Terminal / Google Cloud, follow the step-by-step guide (macOS)
 - **English:** [docs/FIRST_TIME_EN.md](docs/FIRST_TIME_EN.md)
 - **فارسی:** [docs/FIRST_TIME_FA.md](docs/FIRST_TIME_FA.md)
 
+## macOS app (no Python required)
+
+Ordinary Mac users can install a self-contained app from a DMG (Python is bundled inside):
+
+1. On a Mac with this repo + Python 3.11+, build once:
+
+```bash
+./scripts/build_macos_dmg.sh
+```
+
+2. Share `dist/Outlook-to-Gmail-Syncer-<version>.dmg`.
+3. User opens the DMG → drags **Outlook to Gmail Syncer.app** to Applications → double-clicks.
+4. All setup / get / sync / store / schedule actions are buttons in the app.
+
+App data (config, Google tokens, encrypted store) goes to:
+
+`~/Library/Application Support/outlook-to-gmail-calendar-syncer/`
+
+Optional CLI using the same binary (still no system Python):
+
+```bash
+/Applications/Outlook\ to\ Gmail\ Syncer.app/Contents/MacOS/OutlookToGmailSyncer sync --dry-run
+```
+
+For public downloads, sign and notarize the app/DMG with an Apple Developer ID (the build script prints example commands).
+
 ## Quick start
 
 Python **3.11+**.
@@ -215,7 +241,7 @@ python -m syncer sync
 ## Versioning & releases
 
 - Current version: see [`VERSION`](VERSION) (also `python -m syncer --version`).
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.4.0`).
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.5.0`).
 - Tag locally after bumping `VERSION` + changelog, then push the tag and attach build artifacts on GitHub Releases.
 
 ## License

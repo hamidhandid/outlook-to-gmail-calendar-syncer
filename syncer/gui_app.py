@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from typing import Any
 
 import customtkinter as ctk
 import yaml
 
+from . import __version__
 from .api import (
     check_tokens_status,
     format_event_row,
@@ -16,6 +19,8 @@ from .api import (
     login_exchange,
     reauth_google,
     run_sync,
+    run_sync_from_encrypted,
+    store_events_encrypted,
 )
 from .bootstrap import CREDENTIALS_PATH, ensure_user_files
 from .config import (
@@ -40,9 +45,9 @@ INFO_COLOR_DARK = "#dddddd"
 class SyncerApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("Outlook → Google Calendar")
-        self.geometry("920x740")
-        self.minsize(780, 620)
+        self.title(f"Outlook → Google Calendar  v{__version__}")
+        self.geometry("980x820")
+        self.minsize(820, 680)
 
         self._events: list[SourceEvent] = []
         self._busy = False
@@ -51,7 +56,7 @@ class SyncerApp(ctk.CTk):
         self._build()
         self._load_config_into_form()
         self._report_bootstrap()
-        self._set_status("Ready. Save config, then Get events (VPN on).", "info")
+        self._set_status("Ready. Save config, then Get events (company VPN on).", "info")
 
     def _build(self) -> None:
         self.grid_columnconfigure(0, weight=1)
@@ -63,7 +68,14 @@ class SyncerApp(ctk.CTk):
             text="Outlook → Google Calendar Sync",
             font=ctk.CTkFont(size=20, weight="bold"),
         )
-        header.grid(row=0, column=0, padx=16, pady=(16, 8), sticky="w")
+        header.grid(row=0, column=0, padx=16, pady=(16, 4), sticky="w")
+
+        ctk.CTkLabel(
+            self,
+            text=f"Data folder: {ROOT}",
+            font=ctk.CTkFont(size=11),
+            text_color="gray50",
+        ).grid(row=0, column=0, padx=16, pady=(40, 0), sticky="w")
 
         config = ctk.CTkFrame(self)
         config.grid(row=1, column=0, padx=16, pady=8, sticky="ew")
@@ -106,18 +118,15 @@ class SyncerApp(ctk.CTk):
         self.google_calendar = ctk.CTkEntry(config)
         self.google_calendar.grid(row=3, column=1, columnspan=2, padx=8, pady=6, sticky="ew")
 
-        save_btn = ctk.CTkButton(config, text="Save config", width=110, command=self._save_config)
-        save_btn.grid(row=3, column=3, padx=8, pady=6, sticky="e")
-
-        setup_btn = ctk.CTkButton(
+        ctk.CTkButton(config, text="Save config", width=110, command=self._save_config).grid(
+            row=3, column=3, padx=8, pady=6, sticky="e"
+        )
+        ctk.CTkButton(
             config, text="Setup Google", width=120, command=self._on_setup_google
-        )
-        setup_btn.grid(row=3, column=4, padx=8, pady=6, sticky="e")
-
-        import_btn = ctk.CTkButton(
+        ).grid(row=3, column=4, padx=8, pady=6, sticky="e")
+        ctk.CTkButton(
             config, text="Import credentials…", width=140, command=self._on_import_credentials
-        )
-        import_btn.grid(row=3, column=5, padx=8, pady=6, sticky="e")
+        ).grid(row=3, column=5, padx=8, pady=6, sticky="e")
 
         events_frame = ctk.CTkFrame(self)
         events_frame.grid(row=2, column=0, padx=16, pady=8, sticky="nsew")
@@ -145,51 +154,104 @@ class SyncerApp(ctk.CTk):
         self._init_log_tags()
 
         actions = ctk.CTkFrame(self)
-        actions.grid(row=4, column=0, padx=16, pady=(0, 8), sticky="ew")
+        actions.grid(row=4, column=0, padx=16, pady=(0, 4), sticky="ew")
 
-        self.get_btn = ctk.CTkButton(actions, text="Get", width=100, command=self._on_get)
-        self.get_btn.pack(side="left", padx=6, pady=8)
+        self.get_btn = ctk.CTkButton(actions, text="Get", width=90, command=self._on_get)
+        self.get_btn.pack(side="left", padx=4, pady=6)
 
         self.sync_btn = ctk.CTkButton(
-            actions, text="Sync", width=100, command=self._on_sync, state="disabled"
+            actions, text="Sync", width=90, command=self._on_sync, state="disabled"
         )
-        self.sync_btn.pack(side="left", padx=6, pady=8)
+        self.sync_btn.pack(side="left", padx=4, pady=6)
+
+        self.dry_btn = ctk.CTkButton(
+            actions, text="Sync dry-run", width=110, command=self._on_sync_dry
+        )
+        self.dry_btn.pack(side="left", padx=4, pady=6)
 
         self.stop_btn = ctk.CTkButton(
             actions,
             text="Stop",
-            width=100,
+            width=80,
             fg_color=ERROR_COLOR,
             hover_color="#a32f2f",
             command=self._on_stop,
             state="disabled",
         )
-        self.stop_btn.pack(side="left", padx=6, pady=8)
+        self.stop_btn.pack(side="left", padx=4, pady=6)
 
         self.tokens_btn = ctk.CTkButton(
-            actions, text="Check tokens", width=120, command=self._on_tokens
+            actions, text="Check tokens", width=110, command=self._on_tokens
         )
-        self.tokens_btn.pack(side="left", padx=6, pady=8)
+        self.tokens_btn.pack(side="left", padx=4, pady=6)
 
         self.login_btn = ctk.CTkButton(
-            actions, text="Login Exchange", width=130, command=self._on_login
+            actions, text="Login Exchange", width=120, command=self._on_login
         )
-        self.login_btn.pack(side="left", padx=6, pady=8)
+        self.login_btn.pack(side="left", padx=4, pady=6)
 
         self.reauth_btn = ctk.CTkButton(
-            actions, text="Reauth Google", width=120, command=self._on_reauth
+            actions, text="Reauth Google", width=110, command=self._on_reauth
         )
-        self.reauth_btn.pack(side="left", padx=6, pady=8)
+        self.reauth_btn.pack(side="left", padx=4, pady=6)
+
+        more = ctk.CTkFrame(self)
+        more.grid(row=5, column=0, padx=16, pady=(0, 4), sticky="ew")
+
+        self.store_btn = ctk.CTkButton(
+            more, text="Store encrypted", width=130, command=self._on_store
+        )
+        self.store_btn.pack(side="left", padx=4, pady=6)
+
+        self.sync_stored_btn = ctk.CTkButton(
+            more, text="Sync from file", width=120, command=self._on_sync_stored
+        )
+        self.sync_stored_btn.pack(side="left", padx=4, pady=6)
+
+        self.list_cal_btn = ctk.CTkButton(
+            more, text="List calendars", width=120, command=self._on_list_calendars
+        )
+        self.list_cal_btn.pack(side="left", padx=4, pady=6)
+
+        self.check_btn = ctk.CTkButton(more, text="Check", width=80, command=self._on_check)
+        self.check_btn.pack(side="left", padx=4, pady=6)
+
+        self.sched_btn = ctk.CTkButton(
+            more, text="Install schedule", width=130, command=self._on_install_schedule
+        )
+        self.sched_btn.pack(side="left", padx=4, pady=6)
+
+        self.unsched_btn = ctk.CTkButton(
+            more, text="Uninstall schedule", width=140, command=self._on_uninstall_schedule
+        )
+        self.unsched_btn.pack(side="left", padx=4, pady=6)
+
+        self.data_btn = ctk.CTkButton(
+            more, text="Open data folder", width=130, command=self._on_open_data
+        )
+        self.data_btn.pack(side="left", padx=4, pady=6)
+
+        self._action_buttons = [
+            self.get_btn,
+            self.dry_btn,
+            self.tokens_btn,
+            self.login_btn,
+            self.reauth_btn,
+            self.store_btn,
+            self.sync_stored_btn,
+            self.list_cal_btn,
+            self.check_btn,
+            self.sched_btn,
+            self.unsched_btn,
+            self.data_btn,
+        ]
 
         self.status = ctk.CTkLabel(self, text="", anchor="w")
-        self.status.grid(row=5, column=0, padx=16, pady=(0, 16), sticky="ew")
+        self.status.grid(row=6, column=0, padx=16, pady=(0, 16), sticky="ew")
 
     def _report_bootstrap(self) -> None:
         for note in ensure_user_files():
-            level = "info"
-            if note.startswith("Created") or note.startswith("Missing"):
-                level = "info"
-            self._append_log(level, note)
+            self._append_log("info", note)
         if not CREDENTIALS_PATH.exists():
             self._append_log(
                 "error",
@@ -283,10 +345,8 @@ class SyncerApp(ctk.CTk):
     def _set_busy(self, busy: bool) -> None:
         self._busy = busy
         state = "disabled" if busy else "normal"
-        self.get_btn.configure(state=state)
-        self.tokens_btn.configure(state=state)
-        self.login_btn.configure(state=state)
-        self.reauth_btn.configure(state=state)
+        for btn in self._action_buttons:
+            btn.configure(state=state)
         self.stop_btn.configure(state="normal" if busy else "disabled")
         if busy:
             self.sync_btn.configure(state="disabled")
@@ -309,6 +369,10 @@ class SyncerApp(ctk.CTk):
 
     def _gui_log(self, level: str, message: str) -> None:
         self.after(0, lambda: self._append_log(level, message))
+
+    def _ask_password(self, prompt: str) -> str | None:
+        # simpledialog works for hidden-ish prompts; CTkInputDialog shows text.
+        return simpledialog.askstring("Password", prompt, show="*", parent=self)
 
     def _on_stop(self) -> None:
         self._cancel.set()
@@ -351,11 +415,17 @@ class SyncerApp(ctk.CTk):
         self._run_async(work)
 
     def _on_sync(self) -> None:
-        if not self._events:
-            self._set_status("Get events first.", "error")
-            return
+        self._sync_live(dry_run=False)
+
+    def _on_sync_dry(self) -> None:
+        self._sync_live(dry_run=True)
+
+    def _sync_live(self, *, dry_run: bool) -> None:
         if not CREDENTIALS_PATH.exists():
             self._set_status("Missing credentials.json — Setup Google first.", "error")
+            return
+        if not dry_run and not self._events:
+            self._set_status("Get events first (or use Sync dry-run to fetch+preview).", "error")
             return
         if not self._save_config():
             return
@@ -364,8 +434,8 @@ class SyncerApp(ctk.CTk):
             settings = load_settings()
             result = run_sync(
                 settings,
-                events=list(self._events),
-                dry_run=False,
+                events=list(self._events) if self._events else None,
+                dry_run=dry_run,
                 log=self._gui_log,
                 cancel=self._cancel,
             )
@@ -376,6 +446,59 @@ class SyncerApp(ctk.CTk):
                 else:
                     level = "info" if "Cancelled" in (result.message or "") else "error"
                     self._set_status(result.message or "Sync failed.", level)
+
+            self.after(0, done)
+
+        self._run_async(work)
+
+    def _on_store(self) -> None:
+        if not self._save_config():
+            return
+        password = self._ask_password("Choose a password for the encrypted events file:")
+        if not password:
+            self._set_status("Store cancelled.", "info")
+            return
+        confirm = self._ask_password("Confirm password:")
+        if password != confirm:
+            self._set_status("Passwords did not match.", "error")
+            return
+
+        def work() -> None:
+            result = store_events_encrypted(
+                password=password, log=self._gui_log, cancel=self._cancel
+            )
+
+            def done() -> None:
+                self._set_status(result.message.split("\n")[0], "success" if result.ok else "error")
+
+            self.after(0, done)
+
+        self._run_async(work)
+
+    def _on_sync_stored(self) -> None:
+        if not CREDENTIALS_PATH.exists():
+            self._set_status("Missing credentials.json — Setup Google first.", "error")
+            return
+        if not self._save_config():
+            return
+        password = self._ask_password("Password for the encrypted events file:")
+        if not password:
+            self._set_status("Sync from file cancelled.", "info")
+            return
+
+        def work() -> None:
+            result = run_sync_from_encrypted(
+                password=password,
+                dry_run=False,
+                log=self._gui_log,
+                cancel=self._cancel,
+            )
+
+            def done() -> None:
+                self._set_status(
+                    result.message or ("OK" if result.ok else "Failed"),
+                    "success" if result.ok else "error",
+                )
 
             self.after(0, done)
 
@@ -395,14 +518,13 @@ class SyncerApp(ctk.CTk):
 
         self._run_async(work)
 
+    def _on_check(self) -> None:
+        self._on_tokens()
+
     def _on_login(self) -> None:
         if not self._save_config():
             return
-        dialog = ctk.CTkInputDialog(
-            text=f"Exchange password for {self.email.get().strip()}:",
-            title="Login Exchange",
-        )
-        password = dialog.get_input()
+        password = self._ask_password(f"Exchange password for {self.email.get().strip()}:")
         if not password:
             self._set_status("Login cancelled.", "info")
             return
@@ -424,7 +546,7 @@ class SyncerApp(ctk.CTk):
         if not messagebox.askyesno(
             "Reauth Google",
             "This opens a browser to sign in to Google again.\n"
-            "If the company VPN blocks Google, disconnect it briefly.",
+            "If the company VPN blocks Google, use a personal VPN briefly.",
         ):
             return
 
@@ -438,30 +560,136 @@ class SyncerApp(ctk.CTk):
 
         self._run_async(work)
 
-    def _on_setup_google(self) -> None:
+    def _on_list_calendars(self) -> None:
+        if not self._save_config():
+            return
+
+        def work() -> None:
+            lines: list[str] = []
+            try:
+                settings = load_settings()
+                if settings.source == "ews" and settings.ews is not None:
+                    from . import ews
+
+                    account = ews.connect(settings.ews)
+                    lines.append(
+                        f"Exchange calendars on {settings.ews.server} "
+                        f"as {settings.ews.email}:"
+                    )
+                    found = ews.list_calendars(account)
+                    if not found:
+                        lines.append("  (none — default mailbox calendar will be used)")
+                    else:
+                        lines.extend(f"  {info.label}" for info in found)
+                else:
+                    from . import apple
+
+                    lines.append("Apple calendars:")
+                    lines.extend(f"  {info.label}" for info in apple.list_calendars())
+                self._gui_log("success", "Listed calendars.")
+            except SystemExit as exc:
+                msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+                lines = [msg]
+                self._gui_log("error", msg)
+            except Exception as exc:
+                lines = [str(exc)]
+                self._gui_log("error", str(exc))
+
+            def done() -> None:
+                self._set_events_text(lines)
+                self._set_status("Calendar list updated.", "info")
+
+            self.after(0, done)
+
+        self._run_async(work)
+
+    def _on_install_schedule(self) -> None:
         if not messagebox.askyesno(
-            "Setup Google",
-            "Open the guided Google Cloud OAuth setup in the terminal flow?\n"
-            "(Browser pages will open. Prefer disconnecting VPN if Google is blocked.)",
+            "Install schedule",
+            "Run sync automatically every 15 minutes while this Mac is on?",
         ):
             return
 
         def work() -> None:
             try:
-                from .wizard import walk_google_oauth
+                from .schedule import install_schedule
 
-                walk_google_oauth()
-                msg = "Google setup finished (or skipped). Check credentials.json."
+                install_schedule()
+                msg = "Schedule installed (every 15 minutes)."
                 self._gui_log("success", msg)
+            except SystemExit as exc:
+                msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+                self._gui_log("error", msg)
             except Exception as exc:
+                msg = str(exc)
+                self._gui_log("error", msg)
+
+            def done() -> None:
+                self._set_status(msg, "success" if "installed" in msg.lower() else "error")
+
+            self.after(0, done)
+
+        self._run_async(work)
+
+    def _on_uninstall_schedule(self) -> None:
+        def work() -> None:
+            try:
+                from .schedule import uninstall_schedule
+
+                uninstall_schedule()
+                msg = "Schedule removed."
+                self._gui_log("success", msg)
+            except SystemExit as exc:
+                msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
+                self._gui_log("error", msg)
+            except Exception as exc:
+                msg = str(exc)
+                self._gui_log("error", msg)
+
+            def done() -> None:
+                self._set_status(msg, "info")
+
+            self.after(0, done)
+
+        self._run_async(work)
+
+    def _on_open_data(self) -> None:
+        ROOT.mkdir(parents=True, exist_ok=True)
+        try:
+            if sys.platform == "darwin":
+                subprocess.run(["open", str(ROOT)], check=False)
+            elif sys.platform == "win32":
+                subprocess.run(["explorer", str(ROOT)], check=False)
+            else:
+                subprocess.run(["xdg-open", str(ROOT)], check=False)
+            self._set_status(f"Opened {ROOT}", "success")
+        except Exception as exc:
+            self._set_status(f"Could not open folder: {exc}", "error")
+
+    def _on_setup_google(self) -> None:
+        from .wizard import walk_google_oauth_gui
+
+        def ask_continue(title: str, message: str) -> bool:
+            return bool(messagebox.askokcancel(title, message, parent=self))
+
+        def work() -> None:
+            try:
+                ok = walk_google_oauth_gui(ask_continue=ask_continue, log=self._gui_log)
+                msg = (
+                    "Google setup finished."
+                    if ok and CREDENTIALS_PATH.exists()
+                    else "Google setup incomplete — use Import credentials… if needed."
+                )
+            except Exception as exc:
+                ok = False
                 msg = f"Google setup failed: {exc}"
                 self._gui_log("error", msg)
 
             def done() -> None:
-                if CREDENTIALS_PATH.exists():
-                    self._set_status("credentials.json is present.", "success")
-                else:
-                    self._set_status(msg, "error")
+                self._set_status(
+                    msg,
+                    "success" if CREDENTIALS_PATH.exists() else "error",
+                )
 
             self.after(0, done)
 
@@ -476,6 +704,7 @@ class SyncerApp(ctk.CTk):
             return
         src = Path(path)
         try:
+            CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
             CREDENTIALS_PATH.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         except OSError as exc:
             self._append_log("error", f"Could not copy credentials: {exc}")

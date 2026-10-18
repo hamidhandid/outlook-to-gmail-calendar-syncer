@@ -7,9 +7,10 @@ from pathlib import Path
 from textwrap import dedent
 
 from .config import ROOT
+from .paths import is_frozen, runtime_executable, sync_argv
 from .platform_util import is_linux, is_macos, is_windows, platform_name
 
-# --- macOS launchd (behavior intentionally unchanged) ---
+# --- macOS launchd (behavior intentionally unchanged on non-frozen) ---
 LABEL = "com.outlook-to-gmail.calendar-syncer"
 PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
 
@@ -24,7 +25,15 @@ LINUX_TIMER = Path.home() / ".config" / "systemd" / "user" / f"{LINUX_UNIT}.time
 
 
 def _python() -> Path:
-    return Path(sys.executable).resolve()
+    return runtime_executable()
+
+
+def _program_arguments_xml() -> str:
+    lines = ["          <array>"]
+    for arg in sync_argv():
+        lines.append(f"            <string>{arg}</string>")
+    lines.append("          </array>")
+    return "\n".join(lines)
 
 
 def install_schedule(interval_seconds: int = 900) -> None:
@@ -70,12 +79,7 @@ def _install_macos_launchd(interval_seconds: int = 900) -> None:
           <key>WorkingDirectory</key>
           <string>{ROOT}</string>
           <key>ProgramArguments</key>
-          <array>
-            <string>{_python()}</string>
-            <string>-m</string>
-            <string>syncer</string>
-            <string>sync</string>
-          </array>
+{_program_arguments_xml()}
           <key>StartInterval</key>
           <integer>{interval_seconds}</integer>
           <key>RunAtLoad</key>
@@ -99,10 +103,16 @@ def _install_macos_launchd(interval_seconds: int = 900) -> None:
             "Try: launchctl bootstrap gui/$(id -u) "
             f'"{PLIST_PATH}"'
         )
+    tip = (
+        "Keep this Mac on, and connect the company VPN when Exchange must be reached."
+        if is_frozen()
+        else "Keep this Mac on, and connect the company VPN so Calendar.app can refresh Outlook."
+    )
     print(
         f"Scheduled sync every {interval_seconds // 60} minutes.\n"
         f"Plist: {PLIST_PATH}\n"
-        "Keep this Mac on, and connect the company VPN so Calendar.app can refresh Outlook."
+        f"Command: {' '.join(sync_argv())}\n"
+        f"{tip}"
     )
 
 
@@ -118,11 +128,11 @@ def _uninstall_macos_launchd() -> None:
 
 def _write_windows_runner() -> Path:
     """Small .cmd so Task Scheduler gets a reliable cwd without nested quote hell."""
-    python = _python()
+    cmd = " ".join(f'"{a}"' if " " in a else a for a in sync_argv())
     body = (
         "@echo off\r\n"
         f'cd /d "{ROOT}"\r\n'
-        f'"{python}" -m syncer sync\r\n'
+        f"{cmd}\r\n"
     )
     WINDOWS_RUNNER.write_text(body, encoding="utf-8", newline="\r\n")
     return WINDOWS_RUNNER
@@ -195,7 +205,10 @@ def _install_linux_systemd(interval_seconds: int = 900) -> None:
     minutes = max(1, interval_seconds // 60)
     logs = ROOT / "logs"
     logs.mkdir(exist_ok=True)
-    python = _python()
+    exec_parts: list[str] = []
+    for i, a in enumerate(sync_argv()):
+        exec_parts.append(_systemd_quote(Path(a)) if i == 0 else a)
+    exec_start = " ".join(exec_parts)
     out_log = logs / "sync.out.log"
     err_log = logs / "sync.err.log"
 
@@ -209,7 +222,7 @@ def _install_linux_systemd(interval_seconds: int = 900) -> None:
             [Service]
             Type=oneshot
             WorkingDirectory={_systemd_quote(ROOT)}
-            ExecStart={_systemd_quote(python)} -m syncer sync
+            ExecStart={exec_start}
             StandardOutput=append:{out_log}
             StandardError=append:{err_log}
             """
@@ -242,19 +255,21 @@ def _install_linux_systemd(interval_seconds: int = 900) -> None:
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
         except FileNotFoundError as exc:
+            cron = " ".join(sync_argv())
             raise SystemExit(
                 "systemctl not found. On Linux this feature needs systemd --user.\n"
                 f"You can instead add a cron line:\n"
-                f"  */{minutes} * * * * cd {ROOT} && {python} -m syncer sync\n"
+                f"  */{minutes} * * * * cd {ROOT} && {cron}\n"
             ) from exc
         except subprocess.CalledProcessError as exc:
             detail = (exc.stderr or exc.stdout or "").strip()
+            cron = " ".join(sync_argv())
             raise SystemExit(
                 "Failed to enable systemd user timer.\n"
                 "If this is a headless session, try: loginctl enable-linger $USER\n"
                 f"Detail: {detail or exc}\n"
                 f"Manual cron alternative:\n"
-                f"  */{minutes} * * * * cd {ROOT} && {python} -m syncer sync"
+                f"  */{minutes} * * * * cd {ROOT} && {cron}"
             ) from exc
 
     print(

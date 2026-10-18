@@ -6,9 +6,15 @@ from typing import Any
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent.parent
+from .paths import bundle_dir, user_data_dir
+
+# Writable project / app-support root (config, credentials, tokens, events.enc, logs).
+ROOT = user_data_dir()
 CONFIG_PATH = ROOT / "config.yaml"
-EXAMPLE_PATH = ROOT / "config.example.yaml"
+# Example ships inside the app bundle when frozen; falls back to project tree in dev.
+EXAMPLE_PATH = bundle_dir() / "config.example.yaml"
+if not EXAMPLE_PATH.exists():
+    EXAMPLE_PATH = ROOT / "config.example.yaml"
 
 
 class ConfigError(Exception):
@@ -109,7 +115,7 @@ def load_settings(path: Path | None = None) -> Settings:
     if not config_path.exists():
         raise ConfigError(
             f"Missing {config_path.name}. Copy config.example.yaml to config.yaml "
-            f"or run: python -m syncer setup / python -m syncer gui"
+            f"or run: python -m syncer setup / open the app and Save config"
         )
     data = yaml.safe_load(config_path.read_text()) or {}
     return _parse_settings(data, config_path)
@@ -155,12 +161,12 @@ def settings_to_dict(settings: Settings) -> dict[str, Any]:
 def save_settings_dict(data: dict[str, Any], path: Path | None = None) -> Path:
     """Validate and write config.yaml. Returns the path written."""
     config_path = path or CONFIG_PATH
-    # Fill defaults for missing keys so partial GUI saves still validate.
     merged = default_config_dict()
     merged.update({k: v for k, v in data.items() if k != "ews"})
     if "ews" in data and isinstance(data["ews"], dict):
         merged["ews"] = {**merged["ews"], **data["ews"]}
     parsed = _parse_settings(merged, config_path)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         yaml.safe_dump(settings_to_dict(parsed), sort_keys=False, allow_unicode=True),
         encoding="utf-8",

@@ -5,6 +5,20 @@ GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH`
 
 ## Unreleased
 
+## 0.5.0 — 2026-10-18
+
+### Added
+
+- Self-contained **macOS `.app` + `.dmg`** build (`./scripts/build_macos_dmg.sh`) — users do not need Python installed
+- Frozen app entry (`syncer.app_entry`): double-click opens the GUI; CLI args still work for launchd / Terminal
+- GUI covers all main commands: Get, Sync, dry-run, Store encrypted, Sync from file, tokens, login, reauth, list calendars, check, install/uninstall schedule, Setup Google, Open data folder
+- User data for the frozen app lives in `~/Library/Application Support/outlook-to-gmail-calendar-syncer/`
+
+### Changed
+
+- `ROOT` / config / credentials / `events.enc` resolve via Application Support when frozen; project folder in development
+- launchd / Task Scheduler / systemd call the frozen binary with `sync` when packaged
+
 ## 0.4.0 — 2026-10-12
 
 ### Added

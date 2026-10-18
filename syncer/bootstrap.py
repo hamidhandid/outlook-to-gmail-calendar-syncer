@@ -24,6 +24,8 @@ def ensure_user_files(*, create_credentials_placeholder: bool = True) -> list[st
     Returns human-readable notes about what was created.
     """
     notes: list[str] = []
+    ROOT.mkdir(parents=True, exist_ok=True)
+    (ROOT / "logs").mkdir(exist_ok=True)
 
     if not CONFIG_PATH.exists():
         if EXAMPLE_PATH.exists():
@@ -36,8 +38,9 @@ def ensure_user_files(*, create_credentials_placeholder: bool = True) -> list[st
             )
             notes.append(f"Created {CONFIG_PATH.name} with defaults")
     else:
-        # Ensure dict merges still work for older partial files
         _ = load_settings_dict(CONFIG_PATH)
+
+    notes.append(f"Data folder: {ROOT}")
 
     if not CREDENTIALS_PATH.exists() and create_credentials_placeholder:
         if not CREDENTIALS_PLACEHOLDER_PATH.exists():
@@ -46,9 +49,8 @@ def ensure_user_files(*, create_credentials_placeholder: bool = True) -> list[st
                     {
                         "_comment": (
                             "This is NOT a working Google OAuth client. "
-                            "Run: python -m syncer setup --google-only "
-                            "or use GUI → Setup Google, then save the real "
-                            "Desktop client JSON as credentials.json in this folder."
+                            "Use Setup Google / Import credentials in the app, "
+                            "then save the real Desktop client JSON as credentials.json."
                         ),
                         "installed": {
                             "client_id": "REPLACE_ME.apps.googleusercontent.com",
@@ -69,8 +71,7 @@ def ensure_user_files(*, create_credentials_placeholder: bool = True) -> list[st
                 f"{CREDENTIALS_PATH.name} via Setup Google"
             )
         notes.append(
-            f"Missing {CREDENTIALS_PATH.name}. Use Setup Google / "
-            "`python -m syncer setup --google-only`."
+            f"Missing {CREDENTIALS_PATH.name}. Use Setup Google / Import credentials."
         )
 
     if not TOKEN_PATH.exists():
