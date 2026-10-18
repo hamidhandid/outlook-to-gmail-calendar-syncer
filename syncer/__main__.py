@@ -34,13 +34,14 @@ MENU_ACTIONS = [
     ("show-outlook-events", "List Outlook events in the configured date window"),
     ("sync --dry-run", "Preview sync without writing to Google"),
     ("sync", "Copy Outlook events into Google Calendar"),
-    ("install-schedule", "Run sync every 15 minutes (launchd / Task Scheduler / systemd)"),
+    ("install-schedule", "Schedule sync (15m / 30m / 1h / 3h / 6h / 12h)"),
     ("uninstall-schedule", "Stop the background schedule"),
     # New options stay at the end so existing menu numbers do not shift.
     ("store", "Fetch Outlook events and save them to an encrypted file"),
     ("sync-stored --dry-run", "Preview sync from the encrypted file (no Outlook fetch)"),
     ("sync-stored", "Sync Google Calendar from a previously encrypted events file"),
     ("reset", "Delete Google sync calendar + all Outlook/Google credentials (asks first)"),
+    ("sync-scheduled", "Background sync (notifies on macOS if it fails)"),
 ]
 
 
@@ -143,6 +144,19 @@ def cmd_sync(*, dry_run: bool) -> None:
     result = run_sync(_settings(), dry_run=dry_run)
     if not result.ok:
         raise SystemExit(result.message)
+
+
+def cmd_sync_scheduled() -> None:
+    """Used by launchd / Task Scheduler / systemd — notifies on macOS failure."""
+    from datetime import datetime
+
+    from .notify import notify_sync_failed
+
+    result = run_sync(_settings(), dry_run=False)
+    if result.ok:
+        return
+    notify_sync_failed(when=datetime.now(), detail=result.message or "sync failed")
+    raise SystemExit(result.message or 1)
 
 
 def cmd_sync_stored(*, input_path: Path | None, dry_run: bool) -> None:
@@ -280,9 +294,20 @@ def dispatch(args: argparse.Namespace) -> None:
     elif args.command == "reset":
         cmd_reset(yes=args.yes, keep_calendar=args.keep_calendar)
     elif args.command == "install-schedule":
-        install_schedule()
+        from .schedule import parse_schedule_every
+
+        every = getattr(args, "every", None) or "15m"
+        try:
+            settings = load_settings()
+            if not getattr(args, "every", None):
+                every = settings.schedule_every
+        except ConfigError:
+            pass
+        install_schedule(parse_schedule_every(every))
     elif args.command == "uninstall-schedule":
         uninstall_schedule()
+    elif args.command == "sync-scheduled":
+        cmd_sync_scheduled()
     else:
         raise SystemExit(f"Unknown command: {args.command}")
 
@@ -368,11 +393,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print what would change without writing to Google.",
     )
-    sub.add_parser(
+    sched_p = sub.add_parser(
         "install-schedule",
-        help="Run sync every 15 minutes (macOS launchd, Windows Task Scheduler, or Linux systemd --user).",
+        help=(
+            "Schedule background sync (macOS launchd, Windows Task Scheduler, "
+            "or Linux systemd --user). Interval: 15m, 30m, 1h, 3h, 6h, 12h."
+        ),
+    )
+    sched_p.add_argument(
+        "--every",
+        default=None,
+        choices=["15m", "30m", "1h", "3h", "6h", "12h"],
+        help="How often to sync (default: config schedule_every or 15m).",
     )
     sub.add_parser("uninstall-schedule", help="Stop the background schedule.")
+    sub.add_parser(
+        "sync-scheduled",
+        help="Run sync for the background schedule; posts a macOS notification on failure.",
+    )
     reset_p = sub.add_parser(
         "reset",
         help=(

@@ -1,21 +1,208 @@
 from __future__ import annotations
 
+import json
 import shutil
 import textwrap
 import webbrowser
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Callable
 
 import yaml
 
 from .config import CONFIG_PATH, EXAMPLE_PATH, ROOT
+from .paths import bundle_dir
 
 GOOGLE_PROJECT = "https://console.cloud.google.com/projectcreate"
 GOOGLE_CALENDAR_API = (
     "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com"
 )
 GOOGLE_AUTH = "https://console.cloud.google.com/auth/overview"
+GOOGLE_BRANDING = "https://console.cloud.google.com/auth/branding"
 GOOGLE_AUDIENCE = "https://console.cloud.google.com/auth/audience"
 GOOGLE_CLIENTS = "https://console.cloud.google.com/auth/clients"
+GOOGLE_CLIENTS_CREATE = "https://console.cloud.google.com/auth/clients/create"
+
+PROGRESS_PATH = ROOT / "google_setup_progress.json"
+
+
+@dataclass(frozen=True)
+class GoogleSetupStep:
+    id: str
+    title: str
+    instructions: str
+    url: str | None
+    screenshot: str | None  # filename under docs/assets/google-setup/
+
+
+# Maps to docs/FIRST_TIME_FA.md Steps 1–6 (GUI expands Step 3–5).
+GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
+    GoogleSetupStep(
+        id="create_project",
+        title="Step 1 — Create a Google Cloud project",
+        instructions=(
+            "A browser page will open.\n"
+            "1. Project name: outlook-calendar-sync (any name is fine)\n"
+            "2. Click Create\n"
+            "3. Select that project in the top project picker\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when done."
+        ),
+        url=GOOGLE_PROJECT,
+        screenshot="step-01.png",
+    ),
+    GoogleSetupStep(
+        id="enable_calendar_api",
+        title="Step 2 — Enable Calendar API",
+        instructions=(
+            "Confirm the project name at the top, then click Enable.\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the API is enabled."
+        ),
+        url=GOOGLE_CALENDAR_API,
+        screenshot="step-02.png",
+    ),
+    GoogleSetupStep(
+        id="oauth_get_started",
+        title="Step 3 — Get started",
+        instructions=(
+            "If you see Google Auth Platform not configured yet, click Get started.\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the Project configuration wizard opens."
+        ),
+        url=GOOGLE_AUTH,
+        screenshot="step-03.png",
+    ),
+    GoogleSetupStep(
+        id="oauth_app_info",
+        title="Step 3 — App name & support email",
+        instructions=(
+            "On App Information:\n"
+            "1. App name: Outlook Calendar Sync\n"
+            "2. User support email: pick your Gmail "
+            "(example@gmail.com in the screenshot)\n"
+            "3. Click Next\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when done."
+        ),
+        url=GOOGLE_AUTH,
+        screenshot="step-04.png",
+    ),
+    GoogleSetupStep(
+        id="oauth_audience",
+        title="Step 3 — Audience: External",
+        instructions=(
+            "On Audience:\n"
+            "1. Select External "
+            "(required for personal Gmail; Internal is only for Google Workspace)\n"
+            "2. Click Next\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when done."
+        ),
+        url=GOOGLE_AUTH,
+        screenshot="step-05.png",
+    ),
+    GoogleSetupStep(
+        id="oauth_contact",
+        title="Step 3 — Contact Information",
+        instructions=(
+            "On Contact Information:\n"
+            "1. Enter your Gmail again (example@gmail.com in the screenshot)\n"
+            "2. Click Next\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when done."
+        ),
+        url=GOOGLE_AUTH,
+        screenshot="step-06.png",
+    ),
+    GoogleSetupStep(
+        id="oauth_finish",
+        title="Step 3 — Finish / Create",
+        instructions=(
+            "On Finish:\n"
+            "1. Check I agree to the Google API Services: User Data Policy\n"
+            "2. Click Continue if shown\n"
+            "3. Click Create\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when OAuth configuration is created."
+        ),
+        url=GOOGLE_AUTH,
+        screenshot="step-07.png",
+    ),
+    GoogleSetupStep(
+        id="test_user_add",
+        title="Step 4 — Click Add users",
+        instructions=(
+            "Under Test users, click + Add users.\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the Add users panel is open."
+        ),
+        url=GOOGLE_AUDIENCE,
+        screenshot="step-08.png",
+    ),
+    GoogleSetupStep(
+        id="test_user_save",
+        title="Step 4 — Type Gmail and Save",
+        instructions=(
+            "1. Type your full Gmail (example@gmail.com in the screenshot)\n"
+            "2. Press Enter so it becomes a chip\n"
+            "3. Click Save\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when done."
+        ),
+        url=GOOGLE_AUDIENCE,
+        screenshot="step-09.png",
+    ),
+    GoogleSetupStep(
+        id="create_client",
+        title="Step 5 — Create client",
+        instructions=(
+            "On the Clients page, click Create client.\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the Create OAuth client ID form is open."
+        ),
+        url=GOOGLE_CLIENTS,
+        screenshot="step-10.png",
+    ),
+    GoogleSetupStep(
+        id="desktop_client",
+        title="Step 5 — Desktop app + name",
+        instructions=(
+            "1. Application type: Desktop app (not Web, not iOS)\n"
+            "2. Name: Mac syncer\n"
+            "3. Click Create\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the OAuth client created dialog appears."
+        ),
+        url=GOOGLE_CLIENTS_CREATE,
+        screenshot="step-11.png",
+    ),
+    GoogleSetupStep(
+        id="download_json",
+        title="Step 5 — Download JSON",
+        instructions=(
+            "In the OAuth client created dialog, click Download JSON.\n"
+            "Keep that file — you need it in the next step.\n\n"
+            "If you leave now, click Setup Google again to resume at this step.\n"
+            "Confirm when the JSON is downloaded."
+        ),
+        url=GOOGLE_CLIENTS,
+        screenshot="step-12.png",
+    ),
+    GoogleSetupStep(
+        id="save_credentials",
+        title="Step 6 — Save credentials.json",
+        instructions=(
+            "Copy the downloaded Desktop OAuth client JSON to credentials.json "
+            "in the app data folder (Import credentials in the GUI, or confirm "
+            "if a recent download was found).\n\n"
+            "Confirm when credentials.json is in place."
+        ),
+        url=None,
+        screenshot="step-13.png",
+    ),
+]
 
 
 def _credentials_path() -> Path:
@@ -24,6 +211,58 @@ def _credentials_path() -> Path:
 
 # Kept for older imports; always points at the writable data dir.
 CREDENTIALS_PATH = _credentials_path()
+
+
+def google_setup_screenshot_path(filename: str | None) -> Path | None:
+    if not filename:
+        return None
+    for base in (bundle_dir() / "docs" / "assets" / "google-setup", Path(__file__).resolve().parent.parent / "docs" / "assets" / "google-setup"):
+        path = base / filename
+        if path.is_file():
+            return path
+    return None
+
+
+def load_google_setup_progress() -> dict[str, Any] | None:
+    if not PROGRESS_PATH.exists():
+        return None
+    try:
+        data = json.loads(PROGRESS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or "step_id" not in data:
+        return None
+    return data
+
+
+def save_google_setup_progress(step_id: str) -> None:
+    PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PROGRESS_PATH.write_text(
+        json.dumps(
+            {
+                "step_id": step_id,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def clear_google_setup_progress() -> None:
+    try:
+        if PROGRESS_PATH.exists():
+            PROGRESS_PATH.unlink()
+    except OSError:
+        pass
+
+
+def _step_index(step_id: str) -> int:
+    for i, step in enumerate(GOOGLE_SETUP_STEPS):
+        if step.id == step_id:
+            return i
+    return 0
 
 
 def _hrule() -> None:
@@ -109,90 +348,105 @@ def _copy_credentials() -> bool:
         print(f"No file at {src}")
 
 
-def walk_google_oauth_gui(*, ask_continue, log=None) -> bool:
+def walk_google_oauth_gui(
+    *,
+    ask_continue: Callable[..., bool],
+    ask_step: Callable[[GoogleSetupStep], bool] | None = None,
+    log=None,
+) -> bool:
     """Browser-based Google OAuth setup for the GUI (no Terminal input).
 
-    ask_continue(title, message) -> bool should show an OK/Cancel dialog.
+    ask_continue(title, message) -> bool — plain Confirm/Cancel.
+    ask_step(step) -> bool — richer step dialog (URL, screenshot, Open link).
+    Falls back to ask_continue when ask_step is omitted.
     """
+
     def _log(msg: str) -> None:
         if log:
             log("info", msg)
 
+    def _ask_step(step: GoogleSetupStep) -> bool:
+        if ask_step is not None:
+            return bool(ask_step(step))
+        body = step.instructions
+        if step.url:
+            body = f"{body}\n\nURL:\n{step.url}"
+        return bool(ask_continue(step.title, body))
+
     if _credentials_path().exists():
         if not ask_continue(
             "Setup Google",
-            "credentials.json already exists.\nContinue and walk through Google Cloud again?",
+            "credentials.json already exists.\n"
+            "Continue and walk through Google Cloud again?",
         ):
             return True
+        clear_google_setup_progress()
 
-    steps = [
-        (
-            "Step 1 — Create a Google Cloud project",
-            "A browser page will open.\n"
-            "1. Project name: outlook-calendar-sync (any name is fine)\n"
-            "2. Click Create\n"
-            "3. Select that project in the top project picker\n\n"
-            "Click OK when done.",
-            GOOGLE_PROJECT,
-        ),
-        (
-            "Step 2 — Enable Calendar API",
-            "Confirm the project name at the top, then click Enable.\n\n"
-            "Click OK when the API is enabled.",
-            GOOGLE_CALENDAR_API,
-        ),
-        (
-            "Step 3 — OAuth consent (Google Auth Platform)",
-            "1. Get started if shown\n"
-            "2. App name: Outlook Calendar Sync\n"
-            "3. User support email: your Gmail\n"
-            "4. Audience: External\n"
-            "5. Contact email: your Gmail\n"
-            "6. Create / Finish\n\n"
-            "Click OK when done.",
-            GOOGLE_AUTH,
-        ),
-        (
-            "Step 4 — Add yourself as a test user",
-            "Under Test users → Add users → your full Gmail → Save.\n\n"
-            "Click OK when done.",
-            GOOGLE_AUDIENCE,
-        ),
-        (
-            "Step 5 — Create a Desktop OAuth client",
-            "1. Create client\n"
-            "2. Application type: Desktop app (not Web)\n"
-            "3. Name: Mac syncer\n"
-            "4. Create → Download JSON\n\n"
-            "Click OK after the JSON is downloaded.",
-            GOOGLE_CLIENTS,
-        ),
-    ]
-    for title, message, url in steps:
-        _log(f"Opening: {url}")
-        try:
-            webbrowser.open(url, new=2)
-        except Exception:
-            pass
-        if not ask_continue(title, message):
-            _log("Google setup cancelled.")
+    start_index = 0
+    progress = load_google_setup_progress()
+    if progress is not None:
+        idx = _step_index(str(progress["step_id"]))
+        step = GOOGLE_SETUP_STEPS[idx]
+        choice = ask_continue(
+            "Resume Google setup?",
+            f"You left off at:\n{step.title}\n\n"
+            "Confirm = continue from that step.\n"
+            "Cancel = start over from Step 1.",
+        )
+        if choice:
+            start_index = idx
+            _log(f"Resuming Google setup at {step.id}")
+        else:
+            clear_google_setup_progress()
+            start_index = 0
+            _log("Starting Google setup from Step 1.")
+
+    for step in GOOGLE_SETUP_STEPS[start_index:]:
+        save_google_setup_progress(step.id)
+        if step.id == "save_credentials":
+            dest = _credentials_path()
+            downloaded = _find_downloaded_json()
+            if downloaded is not None:
+                if ask_continue(
+                    step.title,
+                    f"{step.instructions}\n\n"
+                    f"Found downloaded client file:\n{downloaded}\n\n"
+                    f"Copy it to:\n{dest} ?",
+                ):
+                    shutil.copy2(downloaded, dest)
+                    _log(f"Saved {dest}")
+                    clear_google_setup_progress()
+                    return True
+            if not _ask_step(step):
+                _log(
+                    "Google setup paused. Click Setup Google again to resume "
+                    f"at {step.title}."
+                )
+                return False
+            if dest.exists():
+                clear_google_setup_progress()
+                return True
+            _log(
+                f"credentials.json still missing at {dest}. "
+                "Use Import credentials, then click Setup Google again."
+            )
             return False
 
-    dest = _credentials_path()
-    downloaded = _find_downloaded_json()
-    if downloaded is not None:
-        if ask_continue(
-            "Save credentials.json",
-            f"Found downloaded client file:\n{downloaded}\n\n"
-            f"Copy it to:\n{dest} ?",
-        ):
-            shutil.copy2(downloaded, dest)
-            _log(f"Saved {dest}")
-            return True
-    _log(
-        f"Download finished. Use Import credentials… to save the JSON as:\n{dest}"
-    )
-    return dest.exists()
+        if step.url:
+            _log(f"Opening: {step.url}")
+            try:
+                webbrowser.open(step.url, new=2)
+            except Exception:
+                pass
+        if not _ask_step(step):
+            _log(
+                "Google setup paused. Click Setup Google again to resume "
+                f"at {step.title}."
+            )
+            return False
+
+    clear_google_setup_progress()
+    return _credentials_path().exists()
 
 
 def walk_google_oauth() -> None:
@@ -217,100 +471,42 @@ def walk_google_oauth() -> None:
     ):
         return
 
-    _hrule()
-    print("Step 1 — Create a Google Cloud project")
-    print(
-        textwrap.dedent(
-            """\
-            1. A page titled “New Project” should open.
-            2. Project name: outlook-calendar-sync  (any name is fine)
-            3. Click Create.
-            4. When it finishes, click the project picker at the top and
-               select that project so its name appears in the header.
-            """
-        ).rstrip()
-    )
-    _open(GOOGLE_PROJECT)
-    _pause()
+    start_index = 0
+    progress = load_google_setup_progress()
+    if progress is not None:
+        idx = _step_index(str(progress["step_id"]))
+        step = GOOGLE_SETUP_STEPS[idx]
+        print(f"\nSaved progress: {step.title}")
+        if _yes("Continue from that step?", default=True):
+            start_index = idx
+        else:
+            clear_google_setup_progress()
 
-    _hrule()
-    print("Step 2 — Enable the Google Calendar API")
-    print(
-        textwrap.dedent(
-            """\
-            1. Confirm the project name at the top is the one you just created.
-            2. Click Enable.
-            """
-        ).rstrip()
-    )
-    _open(GOOGLE_CALENDAR_API)
-    _pause("Press Enter after the Calendar API is enabled…")
-
-    _hrule()
-    print("Step 3 — OAuth consent screen (Google Auth Platform)")
-    print(
-        textwrap.dedent(
-            """\
-            Google moved this. It is now “Google Auth Platform”, not the old
-            “APIs & Services → OAuth consent screen”.
-
-            1. If you see Get started, click it.
-            2. App name: Outlook Calendar Sync
-            3. User support email: your Gmail
-            4. Click Next.
-            5. Audience: External
-               (Internal is only for a company Google Workspace. Personal
-               Gmail must be External.)
-            6. Click Next.
-            7. Contact email: your Gmail again.
-            8. Agree to the user data policy, then Create / Finish.
-            """
-        ).rstrip()
-    )
-    _open(GOOGLE_AUTH)
-    _pause("Press Enter after the consent screen is created…")
-
-    _hrule()
-    print("Step 4 — Add yourself as a test user")
-    print(
-        textwrap.dedent(
-            """\
-            While the app is in Testing, only listed accounts can sign in.
-
-            1. Open Audience (the page should open now).
-            2. Under Test users, click Add users.
-            3. Type your full Gmail address → Save.
-            """
-        ).rstrip()
-    )
-    _open(GOOGLE_AUDIENCE)
-    _pause("Press Enter after your Gmail is listed as a test user…")
-
-    _hrule()
-    print("Step 5 — Create a Desktop OAuth client")
-    print(
-        textwrap.dedent(
-            """\
-            1. Click Create client.
-            2. Application type: Desktop app
-               Do not pick Web application or iOS.
-            3. Name: Mac syncer
-            4. Click Create.
-            5. Click Download JSON (or open the client and download).
-            """
-        ).rstrip()
-    )
-    _open(GOOGLE_CLIENTS)
-    _pause("Press Enter after the JSON file is downloaded…")
-
-    _hrule()
-    print("Step 6 — Save credentials.json in this project")
-    print(f"The file must end up at:\n  {CREDENTIALS_PATH}")
-    if not _copy_credentials():
-        print(
-            "\nYou can copy it later with:\n"
-            f"  mv ~/Downloads/client_secret_*.json {CREDENTIALS_PATH}"
+    for step in GOOGLE_SETUP_STEPS[start_index:]:
+        save_google_setup_progress(step.id)
+        _hrule()
+        print(step.title)
+        print(step.instructions)
+        if step.url:
+            _open(step.url)
+        if step.id == "save_credentials":
+            print(f"The file must end up at:\n  {CREDENTIALS_PATH}")
+            if not _copy_credentials():
+                print(
+                    "\nYou can copy it later with:\n"
+                    f"  mv ~/Downloads/client_secret_*.json {CREDENTIALS_PATH}"
+                )
+                print(
+                    "\nTo resume later, run setup again — it will return to this step."
+                )
+                return
+            clear_google_setup_progress()
+            break
+        _pause(
+            "Press Enter when done (or Ctrl+C to pause — run setup again to resume)…"
         )
+
+    clear_google_setup_progress()
     print(
         textwrap.dedent(
             """\

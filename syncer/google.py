@@ -178,6 +178,32 @@ def _all_pages(request_fn) -> list[dict[str, Any]]:
             return items
 
 
+DEFAULT_REMINDER_MINUTES = 15
+
+
+def _ensure_default_reminders(service: Any, calendar_id: str) -> None:
+    """Set calendar default popup reminder to 15 minutes before events."""
+    wanted = [{"method": "popup", "minutes": DEFAULT_REMINDER_MINUTES}]
+    try:
+        entry = service.calendarList().get(calendarId=calendar_id).execute()
+    except HttpError:
+        raise
+    except Exception as exc:
+        raise _google_network_error(exc) from exc
+    existing = entry.get("defaultReminders") or []
+    if existing == wanted:
+        return
+    try:
+        service.calendarList().patch(
+            calendarId=calendar_id,
+            body={"defaultReminders": wanted},
+        ).execute()
+    except HttpError:
+        raise
+    except Exception as exc:
+        raise _google_network_error(exc) from exc
+
+
 def find_or_create_calendar(service: Any, name: str, tz_name: str) -> str:
     try:
         calendars = _all_pages(
@@ -189,7 +215,9 @@ def find_or_create_calendar(service: Any, name: str, tz_name: str) -> str:
         raise _google_network_error(exc) from exc
     for item in calendars:
         if item.get("summary") == name:
-            return item["id"]
+            cal_id = item["id"]
+            _ensure_default_reminders(service, cal_id)
+            return cal_id
     try:
         created = (
             service.calendars()
@@ -200,7 +228,9 @@ def find_or_create_calendar(service: Any, name: str, tz_name: str) -> str:
         raise
     except Exception as exc:
         raise _google_network_error(exc) from exc
-    return created["id"]
+    cal_id = created["id"]
+    _ensure_default_reminders(service, cal_id)
+    return cal_id
 
 
 def find_calendar_by_name(service: Any, name: str) -> dict[str, Any] | None:

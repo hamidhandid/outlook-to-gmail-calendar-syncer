@@ -126,7 +126,7 @@ python -m syncer sync
 # optional offline path (company VPN for store, Google later without Outlook):
 # python -m syncer store
 # python -m syncer sync-stored
-python -m syncer install-schedule # optional, every 15 minutes
+python -m syncer install-schedule --every 15m   # or 30m / 1h / 3h / 6h / 12h
 ```
 
 Events appear in Google Calendar under the name you chose (default **Work (Outlook)**).
@@ -181,17 +181,20 @@ CLI and GUI share `syncer.api` (`get_events`, `run_sync`, …).
 | `python -m syncer sync --dry-run` | Preview without writing to Google |
 | `python -m syncer sync-stored` | Sync Google from a previously encrypted file |
 | `python -m syncer sync-stored --dry-run` | Preview sync from the encrypted file |
-| `python -m syncer install-schedule` | Schedule every 15 minutes (see below) |
+| `python -m syncer install-schedule --every 15m` | Schedule sync (`15m`/`30m`/`1h`/`3h`/`6h`/`12h`) |
 | `python -m syncer uninstall-schedule` | Remove the background schedule |
+| `python -m syncer sync-scheduled` | Background sync (macOS notifies on failure) |
 | `python -m syncer reset` | Delete Google sync calendar + wipe Outlook/Google credentials (asks `DELETE`) |
 
 ### Background schedule by OS
 
 | OS | Mechanism |
 |---|---|
-| macOS | `launchd` LaunchAgent (unchanged) |
+| macOS | `launchd` LaunchAgent; failed runs show a Notification Center alert |
 | Windows | Task Scheduler + generated `run-sync-scheduled.cmd` |
 | Linux | `systemd --user` timer (or cron if systemd is unavailable) |
+
+Pick the interval with `--every` or the GUI dropdown (`15m` … `12h`). Scheduled jobs call `sync-scheduled` so a failed Outlook/Google sync can notify on macOS.
 
 ## Platform notes
 

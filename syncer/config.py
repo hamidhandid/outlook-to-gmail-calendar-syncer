@@ -16,6 +16,9 @@ EXAMPLE_PATH = bundle_dir() / "config.example.yaml"
 if not EXAMPLE_PATH.exists():
     EXAMPLE_PATH = ROOT / "config.example.yaml"
 
+# Keep in sync with syncer.schedule.SCHEDULE_INTERVALS (avoid circular import here).
+SCHEDULE_EVERY_CHOICES = ("15m", "30m", "1h", "3h", "6h", "12h")
+
 
 class ConfigError(Exception):
     """Invalid or missing configuration (safe for GUI and CLI)."""
@@ -41,6 +44,7 @@ class Settings:
     ews: EwsSettings | None
     google_calendar: str
     timezone: str
+    schedule_every: str
     credentials_path: Path
     token_path: Path
     config_path: Path
@@ -95,6 +99,12 @@ def _parse_settings(data: dict, config_path: Path) -> Settings:
         days_forward = int(data.get("days_forward", 60))
     except (TypeError, ValueError) as exc:
         raise ConfigError("days_back and days_forward must be integers") from exc
+    schedule_every = str(data.get("schedule_every", "15m")).strip().lower() or "15m"
+    if schedule_every not in SCHEDULE_EVERY_CHOICES:
+        raise ConfigError(
+            "config.yaml: schedule_every must be one of "
+            + ", ".join(SCHEDULE_EVERY_CHOICES)
+        )
     return Settings(
         source=source,
         days_back=days_back,
@@ -105,6 +115,7 @@ def _parse_settings(data: dict, config_path: Path) -> Settings:
         google_calendar=str(data.get("google_calendar", "Work (Outlook)")).strip()
         or "Work (Outlook)",
         timezone=str(data.get("timezone", "")).strip(),
+        schedule_every=schedule_every,
         credentials_path=ROOT / "credentials.json",
         token_path=ROOT / "token.json",
         config_path=config_path,
@@ -139,6 +150,7 @@ def default_config_dict() -> dict[str, Any]:
         "apple_calendar": "Exchange / Calendar",
         "google_calendar": "Work (Outlook)",
         "timezone": "",
+        "schedule_every": "15m",
     }
 
 
@@ -151,6 +163,7 @@ def settings_to_dict(settings: Settings) -> dict[str, Any]:
         "apple_calendar": settings.apple_calendar,
         "google_calendar": settings.google_calendar,
         "timezone": settings.timezone,
+        "schedule_every": settings.schedule_every,
     }
     if settings.ews is not None:
         payload["ews"] = asdict(settings.ews)

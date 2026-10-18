@@ -39,11 +39,11 @@ def runtime_executable() -> Path:
 
 
 def sync_argv() -> list[str]:
-    """Argv to run a background sync with the current interpreter / frozen binary."""
+    """Argv for the background schedule (notifies on macOS if sync fails)."""
     exe = str(runtime_executable())
     if is_frozen():
-        return [exe, "sync"]
-    return [exe, "-m", "syncer", "sync"]
+        return [exe, "sync-scheduled"]
+    return [exe, "-m", "syncer", "sync-scheduled"]
 
 
 def read_version() -> str:

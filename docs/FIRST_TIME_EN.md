@@ -103,7 +103,7 @@ Come back to Terminal and press **Enter** again.
 
 Now you’ll see Step 2 (Enable the Google Calendar API). In the browser click **Enable**. When it’s done, go back to Terminal and press Enter.
 
-Then Step 3 (OAuth consent / Google Auth Platform). In the browser:
+Then Step 3 (OAuth consent / Google Auth Platform). In the GUI each click has its own screenshot; in the browser:
 
 1. If you see **Get started**, click it.
 2. For App name, type something like `Outlook Calendar Sync`.

@@ -32,3 +32,6 @@ google_calendar: "Work (Outlook)"
 
 # Leave empty to use the OS timezone (macOS Foundation / tzlocal elsewhere).
 timezone: ""
+
+# Background schedule interval when using install-schedule: 15m, 30m, 1h, 3h, 6h, 12h
+schedule_every: 15m

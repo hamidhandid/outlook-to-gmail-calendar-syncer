@@ -372,6 +372,14 @@ class SyncerApp(ctk.CTk):
         # Row 4 — schedule
         row4 = ctk.CTkFrame(self)
         row4.grid(row=7, column=0, padx=16, pady=(2, 4), sticky="ew")
+        ctk.CTkLabel(row4, text="Every").pack(side="left", padx=(4, 2))
+        self.schedule_every = ctk.CTkOptionMenu(
+            row4,
+            values=["15m", "30m", "1h", "3h", "6h", "12h"],
+            width=80,
+        )
+        self.schedule_every.set("15m")
+        self.schedule_every.pack(side="left", padx=4, pady=6)
         self.sched_btn = ctk.CTkButton(
             row4, text="Install schedule", width=140, command=self._on_install_schedule
         )
@@ -499,6 +507,10 @@ class SyncerApp(ctk.CTk):
             self.verify_ssl.deselect()
         self.google_calendar.delete(0, "end")
         self.google_calendar.insert(0, str(data.get("google_calendar", "Work (Outlook)")))
+        every = str(data.get("schedule_every", "15m")).strip().lower() or "15m"
+        if every not in {"15m", "30m", "1h", "3h", "6h", "12h"}:
+            every = "15m"
+        self.schedule_every.set(every)
 
     def _form_to_dict(self) -> dict[str, Any]:
         return {
@@ -508,6 +520,7 @@ class SyncerApp(ctk.CTk):
             "privacy": self.privacy.get(),
             "google_calendar": self.google_calendar.get().strip() or "Work (Outlook)",
             "timezone": "",
+            "schedule_every": self.schedule_every.get(),
             "apple_calendar": "Exchange / Calendar",
             "ews": {
                 "server": self.server.get().strip(),
@@ -591,25 +604,36 @@ class SyncerApp(ctk.CTk):
         # simpledialog works for hidden-ish prompts; CTkInputDialog shows text.
         return simpledialog.askstring("Password", prompt, show="*", parent=self)
 
+    def _center_dialog(self, dialog: ctk.CTkToplevel) -> None:
+        dialog.update_idletasks()
+        x = self.winfo_rootx() + (self.winfo_width() - dialog.winfo_reqwidth()) // 2
+        y = self.winfo_rooty() + (self.winfo_height() - dialog.winfo_reqheight()) // 2
+        dialog.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+
+    def _copyable_text(
+        self, parent: Any, message: str, *, height: int = 120
+    ) -> ctk.CTkTextbox:
+        box = ctk.CTkTextbox(parent, height=height, wrap="word", activate_scrollbars=True)
+        box.pack(fill="both", expand=True, pady=(0, 4))
+        box.insert("1.0", message)
+        box.configure(state="disabled")
+        # Disabled CTkTextbox still allows selection/copy on most platforms.
+        return box
+
     def _confirm(self, title: str, message: str) -> bool:
         """Modal Confirm / Cancel dialog (no typing required). Must run on the UI thread."""
         dialog = ctk.CTkToplevel(self)
         dialog.title(title)
         dialog.transient(self)
-        dialog.resizable(False, False)
+        dialog.resizable(True, True)
         dialog.grab_set()
+        dialog.minsize(420, 200)
 
         result = {"ok": False}
 
         body = ctk.CTkFrame(dialog, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=(18, 8))
-        ctk.CTkLabel(
-            body,
-            text=message,
-            justify="left",
-            wraplength=420,
-            anchor="w",
-        ).pack(anchor="w")
+        self._copyable_text(body, message, height=140)
 
         buttons = ctk.CTkFrame(dialog, fg_color="transparent")
         buttons.pack(fill="x", padx=20, pady=(8, 18))
@@ -635,11 +659,100 @@ class SyncerApp(ctk.CTk):
         ).pack(side="right")
 
         dialog.protocol("WM_DELETE_WINDOW", on_cancel)
-        dialog.update_idletasks()
-        # Center over the main window.
-        x = self.winfo_rootx() + (self.winfo_width() - dialog.winfo_reqwidth()) // 2
-        y = self.winfo_rooty() + (self.winfo_height() - dialog.winfo_reqheight()) // 2
-        dialog.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        self._center_dialog(dialog)
+        dialog.wait_window()
+        return bool(result["ok"])
+
+    def _setup_step_dialog(self, step) -> bool:
+        """Google setup step: screenshot, copyable instructions + URL, Open link, Confirm/Cancel."""
+        import webbrowser
+
+        from .wizard import google_setup_screenshot_path
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(step.title)
+        dialog.transient(self)
+        dialog.resizable(True, True)
+        dialog.grab_set()
+        dialog.minsize(520, 420)
+
+        result = {"ok": False}
+
+        body = ctk.CTkFrame(dialog, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=20, pady=(16, 8))
+
+        shot = google_setup_screenshot_path(step.screenshot)
+        if shot is not None:
+            try:
+                try:
+                    from PIL import Image
+
+                    img = Image.open(shot)
+                    max_w = 480
+                    w, h = img.size
+                    if w > max_w:
+                        h = int(h * (max_w / w))
+                        w = max_w
+                    ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(w, h))
+                    ctk.CTkLabel(body, image=ctk_img, text="").pack(pady=(0, 8))
+                    dialog._setup_img_ref = ctk_img  # noqa: SLF001
+                except ImportError:
+                    photo = tk.PhotoImage(file=str(shot))
+                    # Scale down if very wide.
+                    while photo.width() > 480:
+                        photo = photo.subsample(2, 2)
+                    lbl = tk.Label(body, image=photo, borderwidth=0)
+                    lbl.image = photo  # keep reference
+                    lbl.pack(pady=(0, 8))
+            except Exception:
+                pass
+
+        self._copyable_text(body, step.instructions, height=110)
+
+        if step.url:
+            ctk.CTkLabel(body, text="This link is opening:", anchor="w").pack(
+                fill="x", pady=(8, 2)
+            )
+            url_box = ctk.CTkTextbox(body, height=48, wrap="char")
+            url_box.pack(fill="x")
+            url_box.insert("1.0", step.url)
+            url_box.configure(state="disabled")
+
+            def reopen() -> None:
+                try:
+                    webbrowser.open(step.url, new=2)
+                except Exception:
+                    pass
+
+            ctk.CTkButton(body, text="Open link again", width=140, command=reopen).pack(
+                anchor="w", pady=(6, 0)
+            )
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.pack(fill="x", padx=20, pady=(8, 18))
+
+        def on_cancel() -> None:
+            result["ok"] = False
+            dialog.destroy()
+
+        def on_confirm() -> None:
+            result["ok"] = True
+            dialog.destroy()
+
+        ctk.CTkButton(buttons, text="Cancel", width=100, command=on_cancel).pack(
+            side="right", padx=(8, 0)
+        )
+        ctk.CTkButton(
+            buttons,
+            text="Confirm",
+            width=100,
+            fg_color=ROW_LEAD_COLOR,
+            hover_color=ROW_LEAD_HOVER,
+            command=on_confirm,
+        ).pack(side="right")
+
+        dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+        self._center_dialog(dialog)
         dialog.wait_window()
         return bool(result["ok"])
 
@@ -1058,18 +1171,26 @@ class SyncerApp(ctk.CTk):
         self._run_async(work)
 
     def _on_install_schedule(self) -> None:
-        if not messagebox.askyesno(
+        if not self._save_config():
+            return
+        from .schedule import SCHEDULE_INTERVAL_LABELS, parse_schedule_every
+
+        every = self.schedule_every.get()
+        label = SCHEDULE_INTERVAL_LABELS.get(every, every)
+        if not self._confirm(
             "Install schedule",
-            "Run sync automatically every 15 minutes while this Mac is on?",
+            f"Run sync automatically every {label} while this computer is on?\n\n"
+            "Failed scheduled syncs show a macOS notification.",
         ):
             return
+        seconds = parse_schedule_every(every)
 
         def work() -> None:
             try:
-                from .schedule import install_schedule
+                from .schedule import format_schedule_every, install_schedule
 
-                install_schedule()
-                msg = "Schedule installed (every 15 minutes)."
+                install_schedule(seconds)
+                msg = f"Schedule installed (every {format_schedule_every(seconds)})."
                 self._gui_log("success", msg)
             except SystemExit as exc:
                 msg = str(exc.code) if isinstance(exc.code, str) else str(exc)
@@ -1126,9 +1247,25 @@ class SyncerApp(ctk.CTk):
         def ask_continue(title: str, message: str) -> bool:
             return self._confirm_from_worker(title, message)
 
+        def ask_step(step) -> bool:
+            box: dict[str, bool] = {"ok": False}
+            done = threading.Event()
+
+            def on_main() -> None:
+                try:
+                    box["ok"] = self._setup_step_dialog(step)
+                finally:
+                    done.set()
+
+            self.after(0, on_main)
+            done.wait()
+            return bool(box["ok"])
+
         def work() -> None:
             try:
-                ok = walk_google_oauth_gui(ask_continue=ask_continue, log=self._gui_log)
+                ok = walk_google_oauth_gui(
+                    ask_continue=ask_continue, ask_step=ask_step, log=self._gui_log
+                )
                 if ok and CREDENTIALS_PATH.exists() and not TOKEN_PATH.exists():
                     sign_ok, sign_msg = self._sign_in_google_if_needed(from_worker=True)
                     if sign_ok:

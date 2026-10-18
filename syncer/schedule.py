@@ -10,6 +10,39 @@ from .config import ROOT
 from .paths import is_frozen, runtime_executable, sync_argv
 from .platform_util import is_linux, is_macos, is_windows, platform_name
 
+# User-facing schedule interval choices (label → seconds).
+SCHEDULE_INTERVALS: dict[str, int] = {
+    "15m": 15 * 60,
+    "30m": 30 * 60,
+    "1h": 60 * 60,
+    "3h": 3 * 60 * 60,
+    "6h": 6 * 60 * 60,
+    "12h": 12 * 60 * 60,
+}
+SCHEDULE_INTERVAL_LABELS: dict[str, str] = {
+    "15m": "15 minutes",
+    "30m": "30 minutes",
+    "1h": "1 hour",
+    "3h": "3 hours",
+    "6h": "6 hours",
+    "12h": "12 hours",
+}
+
+
+def parse_schedule_every(value: str) -> int:
+    key = (value or "15m").strip().lower()
+    if key not in SCHEDULE_INTERVALS:
+        choices = ", ".join(SCHEDULE_INTERVALS)
+        raise SystemExit(f"Invalid schedule interval {value!r}. Choose one of: {choices}")
+    return SCHEDULE_INTERVALS[key]
+
+
+def format_schedule_every(seconds: int) -> str:
+    for key, secs in SCHEDULE_INTERVALS.items():
+        if secs == seconds:
+            return SCHEDULE_INTERVAL_LABELS[key]
+    return f"{max(1, seconds // 60)} minutes"
+
 # --- macOS launchd (behavior intentionally unchanged on non-frozen) ---
 LABEL = "com.outlook-to-gmail.calendar-syncer"
 PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
@@ -109,7 +142,7 @@ def _install_macos_launchd(interval_seconds: int = 900) -> None:
         else "Keep this Mac on, and connect the company VPN so Calendar.app can refresh Outlook."
     )
     print(
-        f"Scheduled sync every {interval_seconds // 60} minutes.\n"
+        f"Scheduled sync every {format_schedule_every(interval_seconds)}.\n"
         f"Plist: {PLIST_PATH}\n"
         f"Command: {' '.join(sync_argv())}\n"
         f"{tip}"

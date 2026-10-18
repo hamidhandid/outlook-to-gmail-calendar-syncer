@@ -3,6 +3,21 @@
 All notable changes are documented here.  
 GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH` (see `VERSION`).
 
+## 0.7.0 — 2026-10-18
+
+### Added
+
+- Guided Google setup with per-step screenshots (cursor + click/type callouts), visible reopenable URLs (**Open link again**), and resume via `google_setup_progress.json`
+- GUI Confirm dialogs use selectable/copyable text
+- Sync calendar gets a default **15-minute** popup reminder (new and existing Work calendars)
+- Schedule interval choices: `15m`, `30m`, `1h`, `3h`, `6h`, `12h` (CLI `--every`, GUI dropdown, `schedule_every` in config)
+- `python -m syncer sync-scheduled` for background runs; macOS notification when a scheduled sync fails
+
+### Changed
+
+- Background schedule now invokes `sync-scheduled` instead of plain `sync`
+- Google setup CLI/GUI share structured step metadata
+
 ## 0.6.0 — 2026-10-18
 
 ### Added
