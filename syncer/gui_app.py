@@ -664,50 +664,77 @@ class SyncerApp(ctk.CTk):
         return bool(result["ok"])
 
     def _setup_step_dialog(self, step) -> bool:
-        """Google setup step: screenshot, copyable instructions + URL, Open link, Confirm/Cancel."""
+        """Google setup step: screenshot(s), copyable instructions + URL, Open link, Confirm/Cancel."""
         import webbrowser
 
-        from .wizard import google_setup_screenshot_path
+        from .wizard import google_setup_screenshot_paths
 
         dialog = ctk.CTkToplevel(self)
         dialog.title(step.title)
         dialog.transient(self)
         dialog.resizable(True, True)
         dialog.grab_set()
-        dialog.minsize(520, 420)
+        multi = len(getattr(step, "screenshots", ()) or ()) > 1
+        dialog.minsize(560, 520 if multi else 420)
 
         result = {"ok": False}
 
         body = ctk.CTkFrame(dialog, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=20, pady=(16, 8))
 
-        shot = google_setup_screenshot_path(step.screenshot)
-        if shot is not None:
-            try:
+        shots = google_setup_screenshot_paths(step)
+        img_refs: list[object] = []
+        if shots:
+            shot_host: ctk.CTkFrame | ctk.CTkScrollableFrame
+            if len(shots) > 1:
+                ctk.CTkLabel(
+                    body,
+                    text=f"Screenshots for this page ({len(shots)}) — scroll for each sub-step:",
+                    anchor="w",
+                ).pack(fill="x", pady=(0, 4))
+                shot_host = ctk.CTkScrollableFrame(body, height=300)
+                shot_host.pack(fill="both", expand=True, pady=(0, 8))
+            else:
+                shot_host = body
+
+            for i, shot in enumerate(shots, start=1):
                 try:
-                    from PIL import Image
+                    if len(shots) > 1:
+                        ctk.CTkLabel(
+                            shot_host,
+                            text=f"{i} / {len(shots)}",
+                            anchor="w",
+                            text_color=("gray40", "gray65"),
+                        ).pack(fill="x", pady=(8 if i > 1 else 0, 2))
+                    try:
+                        from PIL import Image
 
-                    img = Image.open(shot)
-                    max_w = 480
-                    w, h = img.size
-                    if w > max_w:
-                        h = int(h * (max_w / w))
-                        w = max_w
-                    ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(w, h))
-                    ctk.CTkLabel(body, image=ctk_img, text="").pack(pady=(0, 8))
-                    dialog._setup_img_ref = ctk_img  # noqa: SLF001
-                except ImportError:
-                    photo = tk.PhotoImage(file=str(shot))
-                    # Scale down if very wide.
-                    while photo.width() > 480:
-                        photo = photo.subsample(2, 2)
-                    lbl = tk.Label(body, image=photo, borderwidth=0)
-                    lbl.image = photo  # keep reference
-                    lbl.pack(pady=(0, 8))
-            except Exception:
-                pass
+                        img = Image.open(shot)
+                        max_w = 500
+                        w, h = img.size
+                        if w > max_w:
+                            h = int(h * (max_w / w))
+                            w = max_w
+                        ctk_img = ctk.CTkImage(
+                            light_image=img, dark_image=img, size=(w, h)
+                        )
+                        ctk.CTkLabel(shot_host, image=ctk_img, text="").pack(
+                            pady=(0, 8)
+                        )
+                        img_refs.append(ctk_img)
+                    except ImportError:
+                        photo = tk.PhotoImage(file=str(shot))
+                        while photo.width() > 500:
+                            photo = photo.subsample(2, 2)
+                        lbl = tk.Label(shot_host, image=photo, borderwidth=0)
+                        lbl.image = photo  # keep reference
+                        lbl.pack(pady=(0, 8))
+                        img_refs.append(photo)
+                except Exception:
+                    pass
+            dialog._setup_img_refs = img_refs  # noqa: SLF001
 
-        self._copyable_text(body, step.instructions, height=110)
+        self._copyable_text(body, step.instructions, height=120 if multi else 110)
 
         if step.url:
             ctk.CTkLabel(body, text="This link is opening:", anchor="w").pack(
@@ -781,8 +808,10 @@ class SyncerApp(ctk.CTk):
         if not ask(
             "Sign in to Google",
             "credentials.json is ready, but token.json is not created yet.\n\n"
-            "Sign in with your Gmail now to create token.json?\n"
-            "(If company VPN blocks Google, use a personal VPN briefly.)",
+            "Confirm to open a browser, sign in with your Gmail test user, "
+            "and Allow Calendar access.\n"
+            "If Google says the app is unverified: Advanced → Go to … (unsafe).\n"
+            "(Use a personal VPN if company VPN blocks Google.)",
         ):
             return False, "Sign-in skipped — click Sign in to Google when ready."
         return reauth_google(log=self._gui_log)
@@ -1266,17 +1295,20 @@ class SyncerApp(ctk.CTk):
                 ok = walk_google_oauth_gui(
                     ask_continue=ask_continue, ask_step=ask_step, log=self._gui_log
                 )
-                if ok and CREDENTIALS_PATH.exists() and not TOKEN_PATH.exists():
+                if ok and CREDENTIALS_PATH.exists() and TOKEN_PATH.exists():
+                    msg = "Google setup finished — signed in (token.json ready)."
+                elif ok and CREDENTIALS_PATH.exists():
+                    # Fallback if the sign-in step was skipped or failed mid-flow.
                     sign_ok, sign_msg = self._sign_in_google_if_needed(from_worker=True)
-                    if sign_ok:
-                        msg = "Google setup finished — token.json created."
+                    if sign_ok and TOKEN_PATH.exists():
+                        msg = "Google setup finished — signed in (token.json ready)."
+                        ok = True
                     else:
                         msg = (
-                            "credentials.json is ready. "
+                            "credentials.json is ready, but Google sign-in is not done. "
                             f"{sign_msg}"
                         )
-                elif ok and CREDENTIALS_PATH.exists():
-                    msg = "Google setup finished."
+                        ok = False
                 else:
                     msg = "Google setup incomplete — use Import credentials if needed."
                     ok = False

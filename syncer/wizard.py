@@ -33,10 +33,13 @@ class GoogleSetupStep:
     title: str
     instructions: str
     url: str | None
-    screenshot: str | None  # filename under docs/assets/google-setup/
+    # One or more filenames under docs/assets/google-setup/ (same browser URL).
+    screenshots: tuple[str, ...] = ()
 
 
-# Maps to docs/FIRST_TIME_FA.md Steps 1–6 (GUI expands Step 3–5).
+# Maps to docs/FIRST_TIME_FA.md Steps 1–6.
+# Consecutive actions that share one console URL are one GUI step with
+# multiple screenshots in the same dialog.
 GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
     GoogleSetupStep(
         id="create_project",
@@ -50,7 +53,7 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when done."
         ),
         url=GOOGLE_PROJECT,
-        screenshot="step-01.png",
+        screenshots=("step-01.png",),
     ),
     GoogleSetupStep(
         id="enable_calendar_api",
@@ -61,98 +64,47 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when the API is enabled."
         ),
         url=GOOGLE_CALENDAR_API,
-        screenshot="step-02.png",
+        screenshots=("step-02.png",),
     ),
     GoogleSetupStep(
-        id="oauth_get_started",
-        title="Step 3 — Get started",
+        id="oauth_consent",
+        title="Step 3 — OAuth consent / Auth Platform",
         instructions=(
-            "If you see Google Auth Platform not configured yet, click Get started.\n\n"
-            "If you leave now, click Setup Google again to resume at this step.\n"
-            "Confirm when the Project configuration wizard opens."
-        ),
-        url=GOOGLE_AUTH,
-        screenshot="step-03.png",
-    ),
-    GoogleSetupStep(
-        id="oauth_app_info",
-        title="Step 3 — App name & support email",
-        instructions=(
-            "On App Information:\n"
-            "1. App name: Outlook Calendar Sync\n"
-            "2. User support email: pick your Gmail "
-            "(example@gmail.com in the screenshot)\n"
-            "3. Click Next\n\n"
-            "If you leave now, click Setup Google again to resume at this step.\n"
-            "Confirm when done."
-        ),
-        url=GOOGLE_AUTH,
-        screenshot="step-04.png",
-    ),
-    GoogleSetupStep(
-        id="oauth_audience",
-        title="Step 3 — Audience: External",
-        instructions=(
-            "On Audience:\n"
-            "1. Select External "
-            "(required for personal Gmail; Internal is only for Google Workspace)\n"
-            "2. Click Next\n\n"
-            "If you leave now, click Setup Google again to resume at this step.\n"
-            "Confirm when done."
-        ),
-        url=GOOGLE_AUTH,
-        screenshot="step-05.png",
-    ),
-    GoogleSetupStep(
-        id="oauth_contact",
-        title="Step 3 — Contact Information",
-        instructions=(
-            "On Contact Information:\n"
-            "1. Enter your Gmail again (example@gmail.com in the screenshot)\n"
-            "2. Click Next\n\n"
-            "If you leave now, click Setup Google again to resume at this step.\n"
-            "Confirm when done."
-        ),
-        url=GOOGLE_AUTH,
-        screenshot="step-06.png",
-    ),
-    GoogleSetupStep(
-        id="oauth_finish",
-        title="Step 3 — Finish / Create",
-        instructions=(
-            "On Finish:\n"
-            "1. Check I agree to the Google API Services: User Data Policy\n"
-            "2. Click Continue if shown\n"
-            "3. Click Create\n\n"
+            "One Google Auth Platform flow (same browser page / wizard):\n"
+            "1. If you see Get started, click it\n"
+            "2. App name: Outlook Calendar Sync\n"
+            "3. User support email: pick your Gmail "
+            "(example@gmail.com in the screenshots), then Next\n"
+            "4. Audience: External (required for personal Gmail), then Next\n"
+            "5. Contact Information: your Gmail again, then Next\n"
+            "6. Check I agree…, Continue if shown, then Create\n\n"
+            "Scroll the screenshots below for each sub-step.\n"
             "If you leave now, click Setup Google again to resume at this step.\n"
             "Confirm when OAuth configuration is created."
         ),
         url=GOOGLE_AUTH,
-        screenshot="step-07.png",
-    ),
-    GoogleSetupStep(
-        id="test_user_add",
-        title="Step 4 — Click Add users",
-        instructions=(
-            "Under Test users, click + Add users.\n\n"
-            "If you leave now, click Setup Google again to resume at this step.\n"
-            "Confirm when the Add users panel is open."
+        screenshots=(
+            "step-03.png",
+            "step-04.png",
+            "step-05.png",
+            "step-06.png",
+            "step-07.png",
         ),
-        url=GOOGLE_AUDIENCE,
-        screenshot="step-08.png",
     ),
     GoogleSetupStep(
-        id="test_user_save",
-        title="Step 4 — Type Gmail and Save",
+        id="test_user",
+        title="Step 4 — Add yourself as a test user",
         instructions=(
-            "1. Type your full Gmail (example@gmail.com in the screenshot)\n"
-            "2. Press Enter so it becomes a chip\n"
-            "3. Click Save\n\n"
+            "On the Audience page (Test users):\n"
+            "1. Click + Add users\n"
+            "2. Type your full Gmail (example@gmail.com in the screenshot)\n"
+            "3. Press Enter so it becomes a chip, then click Save\n\n"
+            "Scroll the screenshots below for each sub-step.\n"
             "If you leave now, click Setup Google again to resume at this step.\n"
             "Confirm when done."
         ),
         url=GOOGLE_AUDIENCE,
-        screenshot="step-09.png",
+        screenshots=("step-08.png", "step-09.png"),
     ),
     GoogleSetupStep(
         id="create_client",
@@ -163,7 +115,7 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when the Create OAuth client ID form is open."
         ),
         url=GOOGLE_CLIENTS,
-        screenshot="step-10.png",
+        screenshots=("step-10.png",),
     ),
     GoogleSetupStep(
         id="desktop_client",
@@ -176,7 +128,7 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when the OAuth client created dialog appears."
         ),
         url=GOOGLE_CLIENTS_CREATE,
-        screenshot="step-11.png",
+        screenshots=("step-11.png",),
     ),
     GoogleSetupStep(
         id="download_json",
@@ -188,7 +140,7 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when the JSON is downloaded."
         ),
         url=GOOGLE_CLIENTS,
-        screenshot="step-12.png",
+        screenshots=("step-12.png",),
     ),
     GoogleSetupStep(
         id="save_credentials",
@@ -200,9 +152,37 @@ GOOGLE_SETUP_STEPS: list[GoogleSetupStep] = [
             "Confirm when credentials.json is in place."
         ),
         url=None,
-        screenshot="step-13.png",
+        screenshots=("step-13.png",),
+    ),
+    GoogleSetupStep(
+        id="google_sign_in",
+        title="Step 7 — Sign in to Google and allow access",
+        instructions=(
+            "Next the app opens a browser so you can grant Calendar access.\n\n"
+            "1. Use a personal VPN if company VPN blocks Google\n"
+            "2. Sign in with the same Gmail you added as a test user\n"
+            "3. If you see “Google hasn’t verified this app”:\n"
+            "     Advanced → Go to … (unsafe) → Continue\n"
+            "4. Click Allow so this app can manage your calendars\n"
+            "5. You can close the browser tab when it says success\n\n"
+            "Confirm to open Google sign-in now.\n"
+            "If you leave now, click Setup Google (or Sign in to Google) again."
+        ),
+        url=None,
+        screenshots=(),
     ),
 ]
+
+# Old progress ids map onto merged steps so resume still works.
+_LEGACY_STEP_IDS: dict[str, str] = {
+    "oauth_get_started": "oauth_consent",
+    "oauth_app_info": "oauth_consent",
+    "oauth_audience": "oauth_consent",
+    "oauth_contact": "oauth_consent",
+    "oauth_finish": "oauth_consent",
+    "test_user_add": "test_user",
+    "test_user_save": "test_user",
+}
 
 
 def _credentials_path() -> Path:
@@ -216,11 +196,23 @@ CREDENTIALS_PATH = _credentials_path()
 def google_setup_screenshot_path(filename: str | None) -> Path | None:
     if not filename:
         return None
-    for base in (bundle_dir() / "docs" / "assets" / "google-setup", Path(__file__).resolve().parent.parent / "docs" / "assets" / "google-setup"):
+    for base in (
+        bundle_dir() / "docs" / "assets" / "google-setup",
+        Path(__file__).resolve().parent.parent / "docs" / "assets" / "google-setup",
+    ):
         path = base / filename
         if path.is_file():
             return path
     return None
+
+
+def google_setup_screenshot_paths(step: GoogleSetupStep) -> list[Path]:
+    paths: list[Path] = []
+    for name in step.screenshots:
+        path = google_setup_screenshot_path(name)
+        if path is not None:
+            paths.append(path)
+    return paths
 
 
 def load_google_setup_progress() -> dict[str, Any] | None:
@@ -259,8 +251,9 @@ def clear_google_setup_progress() -> None:
 
 
 def _step_index(step_id: str) -> int:
+    resolved = _LEGACY_STEP_IDS.get(step_id, step_id)
     for i, step in enumerate(GOOGLE_SETUP_STEPS):
-        if step.id == step_id:
+        if step.id == resolved:
             return i
     return 0
 
@@ -403,9 +396,11 @@ def walk_google_oauth_gui(
 
     for step in GOOGLE_SETUP_STEPS[start_index:]:
         save_google_setup_progress(step.id)
+
         if step.id == "save_credentials":
             dest = _credentials_path()
             downloaded = _find_downloaded_json()
+            copied = False
             if downloaded is not None:
                 if ask_continue(
                     step.title,
@@ -415,20 +410,58 @@ def walk_google_oauth_gui(
                 ):
                     shutil.copy2(downloaded, dest)
                     _log(f"Saved {dest}")
+                    copied = True
+            if not copied:
+                if not _ask_step(step):
+                    _log(
+                        "Google setup paused. Click Setup Google again to resume "
+                        f"at {step.title}."
+                    )
+                    return False
+            if not dest.exists():
+                _log(
+                    f"credentials.json still missing at {dest}. "
+                    "Use Import credentials, then click Setup Google again."
+                )
+                return False
+            continue
+
+        if step.id == "google_sign_in":
+            token_path = ROOT / "token.json"
+            if token_path.exists():
+                if ask_continue(
+                    step.title,
+                    "token.json already exists — Google sign-in was done before.\n\n"
+                    "Confirm = keep it and finish.\n"
+                    "Cancel = pause (you can use Reauth Google later).",
+                ):
                     clear_google_setup_progress()
                     return True
+                _log(
+                    "Google setup paused at sign-in. "
+                    "Click Sign in to Google or Setup Google to continue."
+                )
+                return False
             if not _ask_step(step):
                 _log(
                     "Google setup paused. Click Setup Google again to resume "
                     f"at {step.title}."
                 )
                 return False
-            if dest.exists():
+            from .api import reauth_google
+
+            def _api_log(level: str, message: str) -> None:
+                if log:
+                    log(level, message)
+
+            ok, msg = reauth_google(log=_api_log)
+            if ok and token_path.exists():
                 clear_google_setup_progress()
+                _log("Google sign-in finished — token.json created.")
                 return True
             _log(
-                f"credentials.json still missing at {dest}. "
-                "Use Import credentials, then click Setup Google again."
+                f"Google sign-in did not finish ({msg}). "
+                "Click Sign in to Google or Setup Google to try again."
             )
             return False
 
@@ -446,7 +479,7 @@ def walk_google_oauth_gui(
             return False
 
     clear_google_setup_progress()
-    return _credentials_path().exists()
+    return _credentials_path().exists() and (ROOT / "token.json").exists()
 
 
 def walk_google_oauth() -> None:
@@ -500,7 +533,26 @@ def walk_google_oauth() -> None:
                     "\nTo resume later, run setup again — it will return to this step."
                 )
                 return
-            clear_google_setup_progress()
+            continue
+        if step.id == "google_sign_in":
+            token_path = ROOT / "token.json"
+            if token_path.exists() and _yes(
+                "token.json already exists. Skip Google sign-in?", default=True
+            ):
+                break
+            print(
+                "\nA browser will open. Sign in with your Gmail test user and Allow "
+                "Calendar access.\n"
+                "If Google says the app is unverified: Advanced → Go to … (unsafe)."
+            )
+            _pause("Press Enter to open Google sign-in…")
+            from .api import reauth_google
+
+            ok, msg = reauth_google()
+            if not ok:
+                print(f"\nSign-in did not finish: {msg}")
+                print("Run: python -m syncer reauth-google")
+                return
             break
         _pause(
             "Press Enter when done (or Ctrl+C to pause — run setup again to resume)…"
@@ -511,13 +563,11 @@ def walk_google_oauth() -> None:
         textwrap.dedent(
             """\
 
-            Later, `python -m syncer check-google-auth` or `sync` will open a browser.
-            Choose your Gmail. If you see “Google hasn’t verified this app”,
-            that is normal: click Advanced → Go to Outlook Calendar Sync
-            (unsafe) → Allow.
+            Setup finished. Google Calendar access is granted via token.json.
 
             While the app stays in Testing, Google may expire that login
-            after 7 days. Run check or sync again to sign in once more.
+            after 7 days. Run `python -m syncer reauth-google` (or GUI
+            Reauth Google) to sign in again.
             """
         ).rstrip()
     )

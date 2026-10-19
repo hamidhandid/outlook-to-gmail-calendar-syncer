@@ -3,6 +3,18 @@
 All notable changes are documented here.  
 GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH` (see `VERSION`).
 
+## 0.9.0 — 2026-10-19
+
+### Added
+
+- Google Setup final **Step 7 — Sign in to Google and allow access**: opens browser OAuth after `credentials.json` is saved and guides the user through granting Calendar access (`token.json`)
+
+### Changed
+
+- Google Setup GUI merges consecutive actions that share one console URL into fewer steps; multi-screenshot steps show all shots in one scrollable dialog
+- First-time FA/EN install step links to the GitHub [Latest release](https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer/releases/latest) for the DMG download
+- First-time FA/EN guides restore the full pre-DMG **Terminal** walkthrough at the end as an **optional** / **اختیاری** section
+
 ## 0.8.0 — 2026-10-19
 
 ### Added
