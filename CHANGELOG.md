@@ -3,6 +3,17 @@
 All notable changes are documented here.  
 GitHub Releases should use the same version as the git tag: `vMAJOR.MINOR.PATCH` (see `VERSION`).
 
+## 0.8.0 — 2026-10-19
+
+### Added
+
+- `./scripts/release_macos.sh` — ask whether to release the current `VERSION` or an existing previous tag; pick from the 5 latest tags; warn if `v$VERSION` was already tagged and ask whether to continue; build release notes from CHANGELOG between a chosen since-tag and the release version; build the DMG; push the tag if needed; create a GitHub Release with the DMG (`gh` required)
+
+### Changed
+
+- First-time FA/EN guides rewritten around the **DMG + GUI** flow: Privacy & Security **Open Anyway**, Keychain **Always Allow**, company vs personal VPN, Outlook login first, Google Setup with per-step screenshots, Show events / Sync, and Install schedule (e.g. every 30m)
+- README first-time section and macOS DMG install notes point at that GUI walkthrough
+
 ## 0.7.0 — 2026-10-18
 
 ### Added

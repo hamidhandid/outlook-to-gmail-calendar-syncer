@@ -10,7 +10,7 @@ This is a **personal** tool. Check with IT before copying a work calendar to a p
 
 ## First-time guides
 
-If you are new to Terminal / Google Cloud, follow the step-by-step guide (macOS):
+Ordinary Mac users: install the DMG, then follow the GUI walkthrough (Outlook login → Google setup with screenshots → sync → schedule):
 
 - **English:** [docs/FIRST_TIME_EN.md](docs/FIRST_TIME_EN.md)
 - **فارسی:** [docs/FIRST_TIME_FA.md](docs/FIRST_TIME_FA.md)
@@ -27,7 +27,8 @@ Ordinary Mac users can install a self-contained app from a DMG (Python is bundle
 
 2. Share `dist/Outlook-to-Google-Calendar-Syncer-<version>.dmg`.
 3. User opens the DMG → drags **Outlook to Google Calendar Syncer.app** to Applications → double-clicks.
-4. All setup / get / sync / store / schedule actions are buttons in the app.
+4. If macOS blocks the first launch: **System Settings → Privacy & Security → Open Anyway**. Keychain may ask for the Mac password — choose **Always Allow** when offered.
+5. All setup / get / sync / store / schedule actions are buttons in the app (see the first-time guides above).
 
 App data (config, Google tokens, encrypted store) goes to:
 
@@ -246,8 +247,16 @@ python -m syncer sync
 ## Versioning & releases
 
 - Current version: see [`VERSION`](VERSION) (also `python -m syncer --version`).
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.6.0`).
-- Tag locally after bumping `VERSION` + changelog, then push the tag and attach build artifacts on GitHub Releases.
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md) — each GitHub Release should match a section and tag `vX.Y.Z` (example: `v0.8.0`).
+- On a Mac, after bumping `VERSION` + `CHANGELOG.md` and committing:
+
+```bash
+brew install gh   # once
+gh auth login     # once
+./scripts/release_macos.sh
+```
+
+That script asks whether to release the current `VERSION` or an existing previous tag, can pick from the 5 latest tags, builds release notes from `CHANGELOG.md` between a since-tag and the release version, tags if needed, runs `./scripts/build_macos_dmg.sh`, pushes, and creates the GitHub Release with the DMG attached. Options: `--draft`, `--skip-build`, `--dry-run`, `--tag vX.Y.Z`, `--since vX.Y.Z`.
 
 ## License
 

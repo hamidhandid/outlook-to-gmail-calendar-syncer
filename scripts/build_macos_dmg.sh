@@ -14,7 +14,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="$(tr -d '[:space:]' < VERSION)"
+# Optional override for release scripts republishing an older tag from HEAD.
+VERSION="${VERSION_OVERRIDE:-$(tr -d '[:space:]' < VERSION)}"
 APP_NAME="Outlook to Google Calendar Syncer"
 BIN_NAME="OutlookToGoogleCalendarSyncer"
 DMG_NAME="Outlook-to-Google-Calendar-Syncer-${VERSION}.dmg"
