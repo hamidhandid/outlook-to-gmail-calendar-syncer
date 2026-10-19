@@ -22,7 +22,9 @@
 
 ## ۱) نصب از فایل DMG
 
-1. فایل `.dmg` را بگیر (مثلاً از Release گیت‌هاب) و باز کن.
+1. آخرین نسخه را از صفحهٔ Releases گیت‌هاب بگیر:  
+   [Latest release](https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer/releases/latest)  
+   فایل **`.dmg`** را دانلود کن (مثلاً `Outlook-to-Google-Calendar-Syncer-….dmg`) و باز کن.
 2. آیکون **Outlook to Google Calendar Syncer** را بکش داخل پوشهٔ **Applications**.
 3. از Applications برنامه را باز کن (دبل‌کلیک).
 

@@ -22,7 +22,9 @@ You usually cannot use one VPN for both. Switch between them.
 
 ## 1) Install from the DMG
 
-1. Download the `.dmg` (for example from the GitHub Release) and open it.
+1. Get the latest build from the GitHub Releases page:  
+   [Latest release](https://github.com/hamidhandid/outlook-to-gmail-calendar-syncer/releases/latest)  
+   Download the **`.dmg`** file (e.g. `Outlook-to-Google-Calendar-Syncer-….dmg`) and open it.
 2. Drag **Outlook to Google Calendar Syncer** into **Applications**.
 3. Open the app from Applications (double-click).
 
